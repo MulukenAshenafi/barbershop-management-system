@@ -8,6 +8,10 @@ from .serializers import (
     UserSerializer, UserRegistrationSerializer, UserLoginSerializer, UserUpdateSerializer
 )
 from .permissions import IsAdminUser
+from .firebase_auth import verify_firebase_token, get_or_create_user_from_firebase
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -174,6 +178,63 @@ class UserViewSet(viewsets.ModelViewSet):
             'message': 'Specialization updated successfully.',
             'user': UserSerializer(request.user).data
         })
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def firebase_login(self, request):
+        """Firebase social login endpoint."""
+        id_token = request.data.get('id_token')
+        
+        if not id_token:
+            return Response({
+                'success': False,
+                'message': 'Firebase ID token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Verify Firebase token
+            firebase_token = verify_firebase_token(id_token)
+            
+            # Get or create user from Firebase
+            user = get_or_create_user_from_firebase(firebase_token)
+            
+            # Generate JWT token
+            token = RefreshToken.for_user(user)
+            
+            response = Response({
+                'success': True,
+                'message': 'Firebase login successful.',
+                'user': {
+                    'id': str(user.id),
+                    'name': user.name,
+                    'email': user.email,
+                    'role': user.role,
+                    'phone': user.phone,
+                    'profilePic': user.profile_pic,
+                    'location': user.location,
+                    'preferences': user.preferences,
+                    'specialization': user.specialization,
+                },
+                'token': str(token.access_token),
+            }, status=status.HTTP_200_OK)
+            
+            # Set HTTP-only cookie
+            response.set_cookie(
+                'token',
+                str(token.access_token),
+                max_age=15 * 24 * 60 * 60,  # 15 days
+                httponly=True,
+                samesite='Strict',
+                secure=not request.get_host().startswith('localhost')
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Firebase login error: {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'message': f'Firebase authentication failed: {str(e)}'
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
 
 @api_view(['POST'])

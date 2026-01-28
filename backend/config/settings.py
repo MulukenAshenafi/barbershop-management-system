@@ -58,6 +58,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'barbershops.middleware.BarbershopContextMiddleware',  # Multi-tenant middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -92,7 +93,7 @@ DATABASES = {
         'NAME': os.getenv('DB_NAME', 'barbershop_db'),
         'USER': os.getenv('DB_USER', 'postgres'),
         'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),  # Defaults to 'db' in Docker, 'localhost' locally
         'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
@@ -164,6 +165,14 @@ REST_FRAMEWORK = {
     ),
 }
 
+# Add drf_spectacular if installed
+try:
+    import drf_spectacular
+    INSTALLED_APPS.append('drf_spectacular')
+    REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
+except ImportError:
+    pass
+
 # JWT Settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
@@ -196,11 +205,106 @@ CLOUDINARY_STORAGE = {
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-# Chapa Payment Gateway Settings (Placeholder)
+# Chapa Payment Gateway Settings
 CHAPA_SECRET_KEY = os.getenv('CHAPA_SECRET_KEY', '')
 CHAPA_PUBLIC_KEY = os.getenv('CHAPA_PUBLIC_KEY', '')
 CHAPA_WEBHOOK_SECRET = os.getenv('CHAPA_WEBHOOK_SECRET', '')
+CHAPA_WEBHOOK_URL = os.getenv('CHAPA_WEBHOOK_URL', '')
+CHAPA_ENCRYPTION_KEY = os.getenv('CHAPA_ENCRIPTION_KEY', '')
 
-# Firebase Settings (Placeholder for social login)
+# Firebase Settings
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
 FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', '')
+
+# API Documentation (Swagger/OpenAPI)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Barbershop Management System API',
+    'DESCRIPTION': 'REST API for barbershop management system with booking, products, and payment integration',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'COMPONENT_SPLIT_REQUEST': True,
+    'AUTHENTICATION_WHITELIST': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
+
+# Caching Configuration (Redis) - Optional
+# Defaults to Docker service name 'redis' when in Docker, '127.0.0.1' locally
+REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
+try:
+    import django_redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'KEY_PREFIX': 'bsbs',
+            'TIMEOUT': 300,  # 5 minutes default
+        }
+    }
+    # Session cache (optional, uses default cache)
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'default'
+except ImportError:
+    # Fallback to local memory cache if Redis not available
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'KEY_PREFIX': 'bsbs',
+            'TIMEOUT': 300,
+        }
+    }
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'payments': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'accounts': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# Create logs directory if it doesn't exist
+logs_dir = BASE_DIR / 'logs'
+if not logs_dir.exists():
+    os.makedirs(logs_dir, exist_ok=True)

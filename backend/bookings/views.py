@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.core.cache import cache
 from datetime import datetime, timedelta
 from .models import Booking, TimeSlot
 from .serializers import BookingSerializer, TimeSlotSerializer
@@ -11,6 +12,7 @@ from services.models import Service
 from accounts.models import User
 from accounts.permissions import IsAdminUser
 from notifications.models import Notification
+from barbershops.utils import filter_by_barbershop, get_barbershop_from_request
 import re
 
 
@@ -50,13 +52,18 @@ class BookingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """Filter bookings by user role."""
+        """Filter bookings by user role and barbershop (multi-tenant)."""
         user = self.request.user
+        barbershop_id = get_barbershop_from_request(self.request)
+        
         if user.role == 'Admin':
-            return Booking.objects.select_related('customer', 'barber', 'service', 'slot').all()
+            queryset = Booking.objects.select_related('customer', 'barber', 'service', 'slot').all()
         elif user.role == 'Barber':
-            return Booking.objects.filter(barber=user).select_related('customer', 'service', 'slot')
-        return Booking.objects.filter(customer=user).select_related('barber', 'service', 'slot')
+            queryset = Booking.objects.filter(barber=user).select_related('customer', 'service', 'slot')
+        else:
+            queryset = Booking.objects.filter(customer=user).select_related('barber', 'service', 'slot')
+        
+        return filter_by_barbershop(queryset, barbershop_id)
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def create_booking(self, request):
@@ -74,8 +81,17 @@ class BookingViewSet(viewsets.ModelViewSet):
                 'error': 'Missing required fields'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Get barbershop from request context
+        barbershop = getattr(request, 'barbershop', None)
+        
         try:
             service = get_object_or_404(Service, pk=service_id)
+            # Verify service belongs to barbershop if multi-tenant is active
+            if barbershop and service.barbershop and service.barbershop != barbershop:
+                return Response({
+                    'error': 'Service does not belong to this barbershop'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
             barber = get_object_or_404(User, pk=barber_id, role='Barber')
             customer = get_object_or_404(User, pk=customer_id, role='Customer')
             
@@ -126,6 +142,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             # Create time slot
             time_slot = TimeSlot.objects.create(
                 barber=barber,
+                barbershop=barbershop,
                 start_time=available_start_time,
                 end_time=available_end_time,
                 date=booking_date,
@@ -134,6 +151,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             
             # Create booking
             booking = Booking.objects.create(
+                barbershop=barbershop,
                 customer=customer,
                 barber=barber,
                 service=service,

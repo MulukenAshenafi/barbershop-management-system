@@ -15,6 +15,7 @@ urlpatterns = [
     path('update-profile', UserViewSet.as_view({'put': 'update_profile'}), name='customer-update-profile'),
     path('set-preferences', UserViewSet.as_view({'post': 'set_preferences'}), name='customer-set-preferences'),
     path('set-specialization', UserViewSet.as_view({'post': 'set_specialization'}), name='barber-set-specialization'),
+    path('firebase-login', UserViewSet.as_view({'post': 'firebase_login'}), name='firebase-login'),
     
     # Barber routes
     path('barbers/signup', create_barber, name='barber-signup'),

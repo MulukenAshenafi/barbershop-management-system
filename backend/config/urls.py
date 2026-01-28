@@ -6,6 +6,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # API Routes
     path('api/auth/', include('accounts.urls')),
     path('api/customers/', include('accounts.urls')),
     path('api/barbers/', include('accounts.urls')),
@@ -16,3 +18,18 @@ urlpatterns = [
     path('api/payments/', include('payments.standalone_urls')),  # Payment routes (standalone)
     path('api/notifications/', include('notifications.urls')),  # Notification routes
 ]
+
+# Add API documentation routes if drf_spectacular is installed
+try:
+    from drf_spectacular.views import (
+        SpectacularAPIView,
+        SpectacularRedocView,
+        SpectacularSwaggerView,
+    )
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+        path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    ]
+except ImportError:
+    pass

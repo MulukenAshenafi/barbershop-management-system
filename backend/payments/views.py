@@ -4,17 +4,23 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.utils import timezone
 from .models import Payment, PaymentWebhook
+from .chapa_client import ChapaClient
 from bookings.models import Booking
 from services.models import Order
 from accounts.permissions import IsAdminUser
+from notifications.models import Notification
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def booking_payment(request):
-    """Create payment intent for booking (Chapa placeholder)."""
+    """Initialize Chapa payment for booking."""
     total_amount = request.data.get('totalAmount')
     booking_id = request.data.get('bookingId')
     
@@ -33,45 +39,84 @@ def booking_payment(request):
                 'message': 'Duplicate payment detected: this booking has already been paid'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Convert to cents (or smallest currency unit)
-        amount_cents = int(float(total_amount) * 100)  # Assuming ETB, adjust as needed
+        amount = float(total_amount)
         
-        if amount_cents < 50:
+        if amount < 0.50:
             return Response({
                 'success': False,
                 'message': 'Amount must be at least 0.50 ETB'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # TODO: Integrate with Chapa payment gateway
-        # For now, create a mock payment intent
-        # In production, this would call Chapa API to create a payment intent
+        # Initialize Chapa client
+        chapa = ChapaClient()
         
-        # Mock client_secret (replace with actual Chapa integration)
-        client_secret = f"chapa_test_{booking_id}_{amount_cents}"
+        # Generate unique transaction reference
+        tx_ref = chapa.generate_tx_ref(prefix='BOOKING')
+        
+        # Get webhook URL from settings or construct it
+        webhook_url = getattr(settings, 'CHAPA_WEBHOOK_URL', '')
+        if not webhook_url:
+            # Construct webhook URL from request
+            webhook_url = f"{request.scheme}://{request.get_host()}/api/payments/webhook/chapa"
+        
+        # Initialize Chapa transaction
+        chapa_response = chapa.initialize_transaction(
+            amount=amount,
+            currency='ETB',
+            email=request.user.email,
+            first_name=request.user.name.split()[0] if request.user.name else '',
+            last_name=' '.join(request.user.name.split()[1:]) if len(request.user.name.split()) > 1 else '',
+            phone_number=request.user.phone or '',
+            tx_ref=tx_ref,
+            callback_url=webhook_url,
+            return_url=f"{request.scheme}://{request.get_host()}/payment/success",
+            meta={
+                'booking_id': str(booking.id),
+                'user_id': str(request.user.id),
+                'payment_type': 'booking'
+            }
+        )
+        
+        if chapa_response.get('status') != 'success':
+            return Response({
+                'success': False,
+                'message': chapa_response.get('message', 'Failed to initialize payment')
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Create payment record
         payment = Payment.objects.create(
             user=request.user,
             payment_type='booking',
             booking=booking,
-            amount=float(total_amount),
+            amount=amount,
             currency='ETB',
             payment_method='chapa',
             status='pending',
-            metadata={'booking_id': str(booking.id)}
+            chapa_transaction_id=tx_ref,
+            chapa_reference=chapa_response.get('data', {}).get('reference', ''),
+            metadata={
+                'booking_id': str(booking.id),
+                'chapa_response': chapa_response
+            }
         )
         
-        # Update booking payment status (NOTE: In production, this should only happen after webhook confirmation)
-        booking.payment_status = 'Online Paid'
-        booking.payment_intent_id = client_secret
+        # Update booking with transaction reference (status will be updated via webhook)
+        booking.payment_intent_id = tx_ref
+        booking.payment_status = 'Online Pending'
         booking.save()
+        
+        # Return checkout URL for frontend redirect
+        checkout_url = chapa_response.get('data', {}).get('checkout_url', '')
         
         return Response({
             'success': True,
-            'client_secret': client_secret
+            'checkout_url': checkout_url,
+            'tx_ref': tx_ref,
+            'message': 'Payment initialized successfully. Redirect to checkout_url to complete payment.'
         })
         
     except Exception as e:
+        logger.error(f"Chapa payment initialization error: {str(e)}", exc_info=True)
         return Response({
             'success': False,
             'message': 'Error in Payment Processing API',
@@ -82,8 +127,9 @@ def booking_payment(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def order_payment(request):
-    """Create payment intent for order (Chapa placeholder)."""
+    """Initialize Chapa payment for order."""
     total_amount = request.data.get('totalAmount')
+    order_id = request.data.get('orderId')
     
     if not total_amount:
         return Response({
@@ -92,25 +138,82 @@ def order_payment(request):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        # Convert to cents
-        amount_cents = int(float(total_amount) * 100)
+        amount = float(total_amount)
         
-        if amount_cents < 50:
+        if amount < 0.50:
             return Response({
                 'success': False,
                 'message': 'Amount must be at least 0.50 ETB'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # TODO: Integrate with Chapa payment gateway
-        # Mock client_secret
-        client_secret = f"chapa_test_order_{amount_cents}"
+        # Get order if provided
+        order = None
+        if order_id:
+            order = get_object_or_404(Order, pk=order_id, user=request.user)
+        
+        # Initialize Chapa client
+        chapa = ChapaClient()
+        
+        # Generate unique transaction reference
+        tx_ref = chapa.generate_tx_ref(prefix='ORDER')
+        
+        # Get webhook URL
+        webhook_url = getattr(settings, 'CHAPA_WEBHOOK_URL', '')
+        if not webhook_url:
+            webhook_url = f"{request.scheme}://{request.get_host()}/api/payments/webhook/chapa"
+        
+        # Initialize Chapa transaction
+        chapa_response = chapa.initialize_transaction(
+            amount=amount,
+            currency='ETB',
+            email=request.user.email,
+            first_name=request.user.name.split()[0] if request.user.name else '',
+            last_name=' '.join(request.user.name.split()[1:]) if len(request.user.name.split()) > 1 else '',
+            phone_number=request.user.phone or '',
+            tx_ref=tx_ref,
+            callback_url=webhook_url,
+            return_url=f"{request.scheme}://{request.get_host()}/payment/success",
+            meta={
+                'order_id': str(order.id) if order else None,
+                'user_id': str(request.user.id),
+                'payment_type': 'order'
+            }
+        )
+        
+        if chapa_response.get('status') != 'success':
+            return Response({
+                'success': False,
+                'message': chapa_response.get('message', 'Failed to initialize payment')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create payment record
+        payment = Payment.objects.create(
+            user=request.user,
+            payment_type='order',
+            order=order,
+            amount=amount,
+            currency='ETB',
+            payment_method='chapa',
+            status='pending',
+            chapa_transaction_id=tx_ref,
+            chapa_reference=chapa_response.get('data', {}).get('reference', ''),
+            metadata={
+                'order_id': str(order.id) if order else None,
+                'chapa_response': chapa_response
+            }
+        )
+        
+        checkout_url = chapa_response.get('data', {}).get('checkout_url', '')
         
         return Response({
             'success': True,
-            'client_secret': client_secret
+            'checkout_url': checkout_url,
+            'tx_ref': tx_ref,
+            'message': 'Payment initialized successfully. Redirect to checkout_url to complete payment.'
         })
         
     except Exception as e:
+        logger.error(f"Chapa order payment error: {str(e)}", exc_info=True)
         return Response({
             'success': False,
             'message': 'Error in Payment Processing API',
@@ -121,34 +224,161 @@ def order_payment(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])  # Webhook should be publicly accessible but secured with signature
 def chapa_webhook(request):
-    """Handle Chapa payment webhook (placeholder)."""
+    """Handle Chapa payment webhook."""
     try:
-        # TODO: Verify webhook signature from Chapa
-        # signature = request.headers.get('X-Chapa-Signature')
-        # verify_signature(signature, request.body)
-        
         payload = request.data
+        signature = request.headers.get('X-Chapa-Signature', '')
+        
+        # Verify webhook signature
+        chapa = ChapaClient()
+        if not chapa.verify_webhook_signature(request.body, signature):
+            logger.warning(f"Invalid webhook signature: {signature}")
+            return Response({
+                'success': False,
+                'message': 'Invalid signature'
+            }, status=status.HTTP_401_UNAUTHORIZED)
         
         # Store webhook event
         webhook = PaymentWebhook.objects.create(
             event_type=payload.get('event', 'unknown'),
             payload=payload,
-            signature=request.headers.get('X-Chapa-Signature', ''),
+            signature=signature,
             processed=False
         )
         
-        # TODO: Process webhook based on event type
-        # Example: Update payment status, booking status, etc.
+        # Process webhook based on event type
+        event_type = payload.get('event', '')
+        tx_ref = payload.get('tx_ref', '')
         
-        # For now, mark as processed
-        webhook.processed = True
-        webhook.save()
+        if event_type == 'charge.success':
+            # Payment successful
+            try:
+                payment = Payment.objects.get(chapa_transaction_id=tx_ref)
+                payment.status = 'completed'
+                payment.completed_at = timezone.now()
+                payment.metadata['webhook_data'] = payload
+                payment.save()
+                
+                # Update booking/order status
+                if payment.payment_type == 'booking' and payment.booking:
+                    payment.booking.payment_status = 'Online Paid'
+                    payment.booking.save()
+                    
+                    # Create notification
+                    Notification.objects.create(
+                        user=payment.user,
+                        message=f'Your booking payment of {payment.amount} ETB has been confirmed!',
+                        notification_type='payment',
+                        related_booking=payment.booking
+                    )
+                
+                elif payment.payment_type == 'order' and payment.order:
+                    payment.order.payment_info_id = tx_ref
+                    payment.order.payment_info_status = 'completed'
+                    payment.order.paid_at = timezone.now()
+                    payment.order.save()
+                    
+                    # Create notification
+                    Notification.objects.create(
+                        user=payment.user,
+                        message=f'Your order payment of {payment.amount} ETB has been confirmed!',
+                        notification_type='payment',
+                        related_order=payment.order
+                    )
+                
+                webhook.processed = True
+                webhook.save()
+                
+            except Payment.DoesNotExist:
+                logger.error(f"Payment not found for tx_ref: {tx_ref}")
+        
+        elif event_type == 'charge.failure':
+            # Payment failed
+            try:
+                payment = Payment.objects.get(chapa_transaction_id=tx_ref)
+                payment.status = 'failed'
+                payment.metadata['webhook_data'] = payload
+                payment.save()
+                
+                if payment.payment_type == 'booking' and payment.booking:
+                    payment.booking.payment_status = 'Online Pending'
+                    payment.booking.save()
+                
+                webhook.processed = True
+                webhook.save()
+                
+            except Payment.DoesNotExist:
+                logger.error(f"Payment not found for tx_ref: {tx_ref}")
         
         return Response({'success': True}, status=status.HTTP_200_OK)
         
     except Exception as e:
+        logger.error(f"Webhook processing error: {str(e)}", exc_info=True)
         return Response({
             'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_payment(request):
+    """Verify a Chapa payment transaction."""
+    tx_ref = request.data.get('tx_ref')
+    
+    if not tx_ref:
+        return Response({
+            'success': False,
+            'message': 'tx_ref is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        chapa = ChapaClient()
+        verification_response = chapa.verify_transaction(tx_ref)
+        
+        if verification_response.get('status') == 'success':
+            data = verification_response.get('data', {})
+            
+            # Update payment record
+            try:
+                payment = Payment.objects.get(chapa_transaction_id=tx_ref)
+                payment.status = 'completed' if data.get('status') == 'successful' else 'failed'
+                payment.completed_at = timezone.now()
+                payment.metadata['verification_data'] = data
+                payment.save()
+                
+                # Update booking/order if payment successful
+                if payment.status == 'completed':
+                    if payment.payment_type == 'booking' and payment.booking:
+                        payment.booking.payment_status = 'Online Paid'
+                        payment.booking.save()
+                    elif payment.payment_type == 'order' and payment.order:
+                        payment.order.payment_info_id = tx_ref
+                        payment.order.payment_info_status = 'completed'
+                        payment.order.paid_at = timezone.now()
+                        payment.order.save()
+                
+                return Response({
+                    'success': True,
+                    'payment_status': payment.status,
+                    'verification_data': data
+                })
+            except Payment.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': 'Payment record not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({
+                'success': False,
+                'message': verification_response.get('message', 'Verification failed')
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        logger.error(f"Payment verification error: {str(e)}", exc_info=True)
+        return Response({
+            'success': False,
+            'message': 'Error verifying payment',
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

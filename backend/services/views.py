@@ -4,6 +4,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.core.cache import cache
+from django.utils.decorators import method_decorator
+from barbershops.utils import filter_by_barbershop, get_barbershop_from_request
+from .cache_utils import cached_view
 import cloudinary
 import cloudinary.uploader
 from .models import Service, Product, ProductImage, ProductReview, Order, OrderItem, Category
@@ -68,15 +72,24 @@ class ServiceViewSet(viewsets.ModelViewSet):
                 'message': 'Please provide a service image'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Get barbershop from request context
+        barbershop = getattr(request, 'barbershop', None)
+        if not barbershop:
+            return Response({
+                'success': False,
+                'message': 'Barbershop context required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Upload to Cloudinary
         file = request.FILES['file']
         try:
             upload_result = cloudinary.uploader.upload(
                 file,
-                folder='services'
+                folder=f'services/{barbershop.id}'
             )
             
             service_data = {
+                'barbershop': barbershop,
                 'name': request.data.get('name'),
                 'description': request.data.get('description'),
                 'price': request.data.get('price'),
@@ -87,6 +100,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
             }
             
             service = Service.objects.create(**service_data)
+            
+            # Invalidate cache
+            cache.delete_pattern('services_*')
+            
             serializer = self.get_serializer(service)
             
             return Response({
@@ -209,8 +226,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         return [AllowAny()]
     
     def get_queryset(self):
-        """Filter products by keyword and category."""
+        """Filter products by keyword, category, and barbershop (multi-tenant)."""
         queryset = super().get_queryset()
+        barbershop_id = get_barbershop_from_request(self.request)
+        queryset = filter_by_barbershop(queryset, barbershop_id)
+        
         keyword = self.request.query_params.get('keyword', '')
         category = self.request.query_params.get('category', '')
         
@@ -262,11 +282,23 @@ class ProductViewSet(viewsets.ModelViewSet):
                 'message': 'Please provide product images?'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Get barbershop from request context
+        barbershop = getattr(request, 'barbershop', None)
+        if not barbershop:
+            return Response({
+                'success': False,
+                'message': 'Barbershop context required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             file = request.FILES['file']
-            upload_result = cloudinary.uploader.upload(file)
+            upload_result = cloudinary.uploader.upload(
+                file,
+                folder=f'products/{barbershop.id}'
+            )
             
             product = Product.objects.create(
+                barbershop=barbershop,
                 name=request.data.get('name'),
                 description=request.data.get('description'),
                 price=request.data.get('price'),
@@ -279,6 +311,10 @@ class ProductViewSet(viewsets.ModelViewSet):
                 image_url=upload_result['secure_url'],
                 public_id=upload_result['public_id']
             )
+            
+            # Invalidate cache
+            from .cache_utils import invalidate_cache_pattern
+            invalidate_cache_pattern('products_*')
             
             return Response({
                 'success': True,
@@ -436,11 +472,16 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """Filter orders by user role."""
+        """Filter orders by user role and barbershop (multi-tenant)."""
         user = self.request.user
+        barbershop_id = get_barbershop_from_request(self.request)
+        
         if user.role == 'Admin':
-            return Order.objects.all()
-        return Order.objects.filter(user=user)
+            queryset = Order.objects.all()
+        else:
+            queryset = Order.objects.filter(user=user)
+        
+        return filter_by_barbershop(queryset, barbershop_id)
     
     def create(self, request):
         """Create order."""
@@ -448,7 +489,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         shipping_info = data.get('shippingInfo', {})
         order_items = data.get('orderItems', [])
         
+        # Get barbershop from request context
+        barbershop = getattr(request, 'barbershop', None)
+        
         order = Order.objects.create(
+            barbershop=barbershop,
             user=request.user,
             shipping_address=shipping_info.get('address', ''),
             shipping_city=shipping_info.get('city', ''),

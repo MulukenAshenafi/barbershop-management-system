@@ -12,15 +12,148 @@ A full-stack mobile application for managing barbershop operations, including se
 
 ## 📋 Prerequisites
 
+### Docker Setup (Recommended)
+- Docker Desktop (or Docker Engine + Docker Compose)
+- Git
+
+### Manual Setup (Alternative)
 - Python 3.10+
 - Node.js 16+
 - PostgreSQL 12+
+- Redis (optional, for caching - falls back to memory cache if unavailable)
 - Expo CLI (`npm install -g expo-cli`)
 - Git
 
 ## 🚀 Quick Start
 
-### Backend Setup
+### 🐳 Docker Setup (Recommended)
+
+The easiest way to run the entire stack is using Docker Compose. This method requires **no local installation** of Python, Node.js, PostgreSQL, or Redis.
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd BSBS_UPDATED
+   ```
+
+2. **Set up environment variables:**
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Edit .env with your actual values (Cloudinary, Chapa, Firebase, etc.)
+   # Note: DB_HOST and REDIS_URL are automatically set for Docker
+   cd ..
+   ```
+
+3. **Start all services:**
+   ```bash
+   docker compose up --build
+   ```
+   
+   This will start:
+   - PostgreSQL database (port 5432)
+   - Redis cache (port 6379)
+   - Django backend (port 8000)
+   - React/Expo client (ports 19000-19002) - optional, use `--profile client` to include
+
+4. **Run database migrations:**
+   ```bash
+   docker compose exec backend python manage.py migrate
+   ```
+
+5. **Create superuser (optional):**
+   ```bash
+   docker compose exec backend python manage.py createsuperuser
+   ```
+
+6. **Access the services:**
+   - Backend API: http://localhost:8000
+   - API Documentation (Swagger): http://localhost:8000/api/docs/
+   - Django Admin: http://localhost:8000/admin/
+   - ReDoc Documentation: http://localhost:8000/api/redoc/
+
+#### Common Docker Commands
+
+```bash
+# Start services in background
+docker compose up -d
+
+# View logs
+docker compose logs -f backend
+docker compose logs -f db
+docker compose logs -f redis
+
+# Stop all services
+docker compose down
+
+# Stop and remove volumes (⚠️ deletes database data)
+docker compose down -v
+
+# Rebuild after code changes
+docker compose up --build
+
+# Run Django management commands
+docker compose exec backend python manage.py <command>
+docker compose exec backend python manage.py makemigrations
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py createsuperuser
+
+# Run tests
+docker compose exec backend pytest
+
+# Access Django shell
+docker compose exec backend python manage.py shell
+
+# Access PostgreSQL shell
+docker compose exec db psql -U postgres -d barbershop_db
+
+# Access Redis CLI
+docker compose exec redis redis-cli
+```
+
+#### Running Client with Docker (Optional)
+
+The React/Expo client can also run in Docker, but for mobile development, you'll typically run it locally:
+
+```bash
+# Start client in Docker (for web development)
+docker compose --profile client up client
+
+# Or start everything including client
+docker compose --profile client up
+```
+
+**Note:** For mobile app development, it's recommended to run the client locally using Expo CLI, as Docker doesn't support mobile device connections directly.
+
+#### Environment Variables in Docker
+
+The Docker setup automatically configures:
+- `DB_HOST=db` (Docker service name)
+- `REDIS_URL=redis://redis:6379/1` (Docker service name)
+
+Your existing `.env` file will work without changes. The Docker Compose file overrides only these two variables for internal networking.
+
+#### Troubleshooting Docker Setup
+
+1. **Port already in use:**
+   - Change ports in `docker-compose.yml` if 8000, 5432, or 6379 are taken
+   - Or stop the conflicting service
+
+2. **Database connection errors:**
+   - Wait a few seconds after `docker compose up` for PostgreSQL to initialize
+   - Check logs: `docker compose logs db`
+
+3. **Permission errors (Linux/Mac):**
+   - Ensure Docker has proper permissions
+   - Try: `sudo docker compose up`
+
+4. **Windows line endings in entrypoint.sh:**
+   - If you see `/bin/sh^M: bad interpreter`, convert line endings:
+   - Use Git: `git config core.autocrlf input`
+
+### 📦 Manual Setup (Alternative)
+
+#### Backend Setup
 
 1. **Navigate to backend directory:**
    ```bash
@@ -40,6 +173,11 @@ A full-stack mobile application for managing barbershop operations, including se
    ```bash
    pip install -r requirements.txt
    ```
+   
+   **Note**: Some features require additional setup:
+   - **Redis** (for caching): Install Redis server or use cloud Redis
+   - **Firebase Admin SDK**: Only needed if using Firebase social login
+   - **drf-spectacular**: Only needed for API documentation (auto-installed)
 
 4. **Set up environment variables:**
    ```bash
@@ -69,7 +207,7 @@ A full-stack mobile application for managing barbershop operations, including se
    ```
    Backend will run on `http://localhost:8000`
 
-### Frontend Setup
+#### Frontend Setup
 
 1. **Navigate to client directory:**
    ```bash
@@ -142,16 +280,17 @@ See `backend/.env.example` for complete list.
 ### Authentication
 - `POST /api/customers/signup` - Customer registration
 - `POST /api/customers/login` - User login
+- `POST /api/customers/firebase-login` - Firebase social login
 - `GET /api/customers/profile` - Get user profile
 - `PUT /api/customers/update-profile` - Update profile
 
 ### Services
-- `GET /api/service/get-all` - Get all services
+- `GET /api/service/get-all` - Get all services (cached)
 - `POST /api/service/create` - Create service (Admin)
 - `GET /api/service/:id` - Get single service
 
 ### Products
-- `GET /api/product/get-all` - Get all products
+- `GET /api/product/get-all` - Get all products (cached)
 - `POST /api/product/create` - Create product (Admin)
 - `PUT /api/product/:id/review` - Add product review
 
@@ -164,9 +303,16 @@ See `backend/.env.example` for complete list.
 - `POST /api/order/create` - Create order
 - `GET /api/order/my-orders` - Get user orders
 
-### Payments
-- `POST /api/booking/payments` - Process booking payment
-- `POST /api/order/payments` - Process order payment
+### Payments (Chapa)
+- `POST /api/booking/payments` - Initialize booking payment
+- `POST /api/order/payments` - Initialize order payment
+- `POST /api/payments/verify` - Verify payment transaction
+- `POST /api/payments/webhook/chapa` - Chapa webhook handler
+
+### API Documentation
+- `GET /api/docs/` - Swagger UI (interactive API docs)
+- `GET /api/redoc/` - ReDoc documentation
+- `GET /api/schema/` - OpenAPI schema
 
 ## 👥 User Roles
 
@@ -196,8 +342,21 @@ See `backend/.env.example` for complete list.
 ## 🧪 Testing
 
 ### Backend
+
+**With Docker:**
+```bash
+docker compose exec backend pytest
+docker compose exec backend pytest --cov=. --cov-report=html
+```
+
+**Manual Setup:**
 ```bash
 cd backend
+# Using pytest (recommended)
+pytest
+pytest --cov=. --cov-report=html
+
+# Or using Django test runner
 python manage.py test
 ```
 
@@ -210,6 +369,19 @@ npm test
 ## 📦 Deployment
 
 ### Backend
+
+**Docker Production:**
+1. Set `DEBUG=False` in `.env`
+2. Configure `ALLOWED_HOSTS` with your domain in `.env`
+3. Use production database credentials in `.env`
+4. Build and run:
+   ```bash
+   docker compose -f docker-compose.prod.yml up --build
+   ```
+5. Configure reverse proxy (nginx/traefik) for HTTPS/SSL
+6. Set up static file serving (or use Cloudinary for media)
+
+**Manual Production:**
 1. Set `DEBUG=False` in production
 2. Configure `ALLOWED_HOSTS` with your domain
 3. Use production database credentials
@@ -228,6 +400,15 @@ npm test
 ## 🛠️ Development
 
 ### Backend Development
+
+**With Docker:**
+- Django admin available at http://localhost:8000/admin/
+- API documentation: http://localhost:8000/api/docs/
+- Database migrations: `docker compose exec backend python manage.py makemigrations && docker compose exec backend python manage.py migrate`
+- Code changes are automatically reflected (volume mounting)
+- View logs: `docker compose logs -f backend`
+
+**Manual Setup:**
 - Django admin available at `/admin/`
 - API documentation: Use Django REST Framework browsable API
 - Database migrations: `python manage.py makemigrations && python manage.py migrate`
@@ -236,6 +417,7 @@ npm test
 - Hot reload enabled by default
 - Expo DevTools available in browser
 - React Native Debugger for debugging
+- For mobile testing, run client locally (not in Docker) to connect to physical devices
 
 ## 📝 Notes
 
@@ -255,21 +437,27 @@ npm test
 
 ## 📄 License
 
+## 📄 License
+
 This project is private and proprietary.
 
-## 👤 Author
+## ✨ Recent Features Completed
 
-Developed as a university project, migrated to Django for professional portfolio.
+- ✅ **Docker & Docker Compose Setup** - Full containerization for easy development and deployment
+- ✅ **Chapa Payment Gateway Integration** - Full payment processing with webhooks
+- ✅ **Firebase Social Login** - Google/Facebook authentication support
+- ✅ **Comprehensive Test Coverage** - Unit and integration tests with pytest
+- ✅ **API Documentation** - Swagger/OpenAPI with interactive docs
+- ✅ **Multi-Tenant Activation** - Automatic tenant isolation and filtering
+- ✅ **Redis Caching Layer** - Performance optimization for frequently accessed data
 
 ## 🐛 Known Issues / TODO
 
-- [ ] Complete Chapa payment gateway integration
-- [ ] Implement Firebase social login
-- [ ] Add comprehensive test coverage
-- [ ] Add API documentation (Swagger/OpenAPI)
-- [ ] Implement multi-tenant activation
-- [ ] Add caching layer for performance
 - [ ] Set up CI/CD pipeline
+- [ ] Add more integration tests
+- [ ] Performance monitoring and optimization
+- [ ] Add rate limiting
+- [ ] Implement email notifications
 
 ## 📞 Support
 
