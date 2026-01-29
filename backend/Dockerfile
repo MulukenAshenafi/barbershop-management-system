@@ -25,18 +25,20 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy project
 COPY . /app/
 
+# Fix CRLF and install entrypoint outside /app so it is NOT overwritten by volume mount (./backend:/app)
+RUN sed -i 's/\r$//' /app/entrypoint.sh 2>/dev/null || true && \
+    cp /app/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
+
 # Create directories for static files and logs
 RUN mkdir -p /app/staticfiles /app/media /app/logs
 
-# Make scripts executable
-RUN chmod +x /app/entrypoint.sh && \
-    chmod +x /app/wait_for_db.py
+RUN chmod +x /app/wait_for_db.py
 
 # Expose port
 EXPOSE 8000
 
-# Use entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Run entrypoint from / so it stays LF; /app is overwritten by volume on host
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
 # Default command (can be overridden in docker-compose)
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]

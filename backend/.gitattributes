@@ -1,0 +1,2 @@
+# Ensure shell scripts use LF in repo and on checkout (fixes Docker "no such file or directory" on Windows)
+*.sh text eol=lf
