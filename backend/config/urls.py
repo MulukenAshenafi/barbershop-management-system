@@ -1,22 +1,22 @@
 """
 URL configuration for barbershop management system.
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # API Routes
     path('api/auth/', include('accounts.urls')),
     path('api/customers/', include('accounts.urls')),
     path('api/barbers/', include('accounts.urls')),
-    path('api/service/', include('services.urls')),  # Service routes
-    path('api/product/', include('services.product_urls')),  # Product routes
-    path('api/booking/', include('bookings.urls')),  # Booking routes
-    path('api/order/', include('services.order_urls')),  # Order routes
-    path('api/payments/', include('payments.standalone_urls')),  # Payment routes (standalone)
-    path('api/notifications/', include('notifications.urls')),  # Notification routes
+    path('api/service/', include('services.urls')),
+    path('api/product/', include('services.product_urls')),
+    path('api/booking/', include('bookings.urls')),
+    path('api/order/', include('services.order_urls')),
+    path('api/payments/', include('payments.standalone_urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 # Add API documentation routes if drf_spectacular is installed
@@ -33,3 +33,7 @@ try:
     ]
 except ImportError:
     pass
+
+# Serve static files in development (DEBUG=True) so admin CSS/JS load without Nginx
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
