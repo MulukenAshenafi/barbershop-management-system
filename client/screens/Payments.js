@@ -1,10 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, TextInput, Button, Alert } from "react-native";
-import axios from "axios";
-import config from "../config"; // Import config for API base URL
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useState, useRef } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Linking,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import api from "../services/api";
+import { useToast } from "../components/common/Toast";
+import { useTheme } from "../context/ThemeContext";
+import Button from "../components/common/Button";
+import { getApiErrorMessage } from "../services/api";
+import { fontSizes, spacing, borderRadius } from "../theme";
+
+function uuidv4() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 const Payments = ({ route, navigation }) => {
+  const toast = useToast();
+  const { colors } = useTheme();
   const {
     customerName,
     barberName,
@@ -12,91 +33,107 @@ const Payments = ({ route, navigation }) => {
     serviceName,
     totalAmount,
     paymentStatus,
-    bookingId, // Get bookingId from route params
-  } = route.params; // Get totalAmount, bookingData, and bookingId from route params
+    bookingId,
+  } = route.params ?? {};
 
-  const [amount, setAmount] = useState(totalAmount.toString());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [checkoutOpened, setCheckoutOpened] = useState(false);
+  const amount = totalAmount != null ? String(totalAmount) : "0";
+  const idempotencyKeyRef = useRef(null);
 
-  useEffect(() => {
-    // Reset the amount when the component is mounted or the totalAmount changes
-    setAmount(totalAmount.toString());
-  }, [totalAmount]);
+  const bid = bookingData?._id ?? bookingId;
+  const hasRequiredParams = bid && totalAmount != null;
 
   const handlePayment = async () => {
-    if (!amount) {
-      Alert.alert("Error", "Please enter a valid amount");
+    if (!hasRequiredParams) {
+      toast.show("Booking info missing. Please start from Book Service.", { type: "error" });
       return;
     }
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = uuidv4();
+    }
+    const idempotencyKey = idempotencyKeyRef.current;
 
+    setIsProcessing(true);
     try {
-      setIsProcessing(true);
-      const token = await AsyncStorage.getItem("token");
-
-      // Ensure both totalAmount and bookingId are sent
-      const response = await axios.post(
-        `${config.apiBaseUrl}/booking/payments`,
-        {
-          totalAmount: parseFloat(amount),
-          bookingId: bookingData._id, // Ensure bookingId is included in the request body
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      const response = await api.post(
+        "payments/booking",
+        { totalAmount: parseFloat(amount), bookingId: bid },
+        { headers: { "Idempotency-Key": idempotencyKey } }
       );
 
-      if (response.data.success) {
-        Alert.alert("Success", "Payment processed successfully!");
-
-        // Clear the amount from the state
-        setAmount(""); // Clear amount in UI
-
-        // Navigate to confirmation screen after successful payment
-        navigation.navigate("Confirmation", {
-          customerName,
-          barberName,
-          bookingData,
-          serviceName,
-          totalAmount,
-          paymentStatus: "Online Paid",
-        });
+      if (response.data.success && response.data.checkout_url) {
+        setCheckoutOpened(true);
+        const opened = await Linking.canOpenURL(response.data.checkout_url);
+        if (opened) {
+          await Linking.openURL(response.data.checkout_url);
+        } else {
+          Alert.alert(
+            "Payment link",
+            "Complete payment at: " + response.data.checkout_url
+          );
+        }
       } else {
-        Alert.alert("Error", response.data.message || "Payment failed");
+        Alert.alert("Error", response.data.message || "Payment init failed");
       }
     } catch (error) {
-      console.error(
-        "Error processing payment:",
-        error.response ? error.response.data : error
-      );
-      Alert.alert(
-        "Error",
-        error.response?.data?.message ||
-          "Something went wrong during the payment"
-      );
+      const msg = getApiErrorMessage(error, "Something went wrong. Please try again.");
+      Alert.alert("Error", msg);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const goToConfirmation = () => {
+    navigation.navigate("Confirmation", {
+      customerName,
+      barberName,
+      bookingData,
+      serviceName,
+      totalAmount,
+      paymentStatus: "Online Paid",
+    });
+  };
+
+  if (!hasRequiredParams) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Booking info missing</Text>
+        <Text style={[styles.amount, { color: colors.textSecondary }]}>
+          Please start from Book Service to pay for a booking.
+        </Text>
+        <Button title="Go back" onPress={() => navigation.goBack()} variant="primary" fullWidth />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Make a Payment</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Amount section will only filled if u select bookin slot."
-        keyboardType="numeric"
-        value={amount}
-        onChangeText={setAmount}
-        editable={false} // Make this field non-editable, using the amount from route params
-      />
-      <Button
-        title={isProcessing ? "Processing..." : "Pay Now"}
-        onPress={handlePayment}
-        disabled={isProcessing}
-      />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.text }]}>Pay for your booking</Text>
+      <Text style={[styles.amount, { color: colors.textSecondary }]}>Amount: {amount} ETB</Text>
+
+      {!checkoutOpened ? (
+        <TouchableOpacity
+          style={[styles.btn, { backgroundColor: colors.primary }, isProcessing && styles.btnDisabled]}
+          onPress={handlePayment}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.btnText}>Pay with Chapa</Text>
+          )}
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.doneSection}>
+          <Text style={[styles.doneText, { color: colors.textSecondary }]}>
+            Complete payment in the browser, then return here.
+          </Text>
+          <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={goToConfirmation}>
+            <Text style={styles.btnText}>I've completed payment</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -107,20 +144,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    padding: 20,
+    padding: spacing.lg,
   },
   title: {
-    fontSize: 24,
+    fontSize: fontSizes.xxl,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: spacing.sm,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    padding: 10,
-    fontSize: 18,
-    marginBottom: 20,
+  amount: {
+    fontSize: fontSizes.lg,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+  },
+  btn: {
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+  },
+  btnDisabled: { opacity: 0.7 },
+  btnText: {
+    color: "#fff",
+    fontSize: fontSizes.base,
+    fontWeight: "600",
+  },
+  doneSection: { marginTop: spacing.md },
+  doneText: {
+    textAlign: "center",
+    marginBottom: spacing.md,
   },
 });

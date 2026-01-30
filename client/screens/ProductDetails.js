@@ -2,8 +2,10 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import { ProductsData } from "../data/ProductsData";
 import Layout from "../components/Layout/Layout";
+import { useToast } from "../components/common/Toast";
 
 const ProductDetails = ({ route }) => {
+  const toast = useToast();
   const [pDetails, setPDetails] = useState({});
   const [qty, setQty] = useState(1);
   const { params } = route;
@@ -14,7 +16,10 @@ const ProductDetails = ({ route }) => {
   }, [params?._id]);
 
   const handleAddQty = () => {
-    if (qty === 10) return alert("You can't add more than 10 quantity");
+    if (qty === 10) {
+      toast.show("You can't add more than 10 quantity", { type: "error" });
+      return;
+    }
     setQty((prev) => prev + 1);
   };
 
@@ -46,7 +51,7 @@ const ProductDetails = ({ route }) => {
           </View>
           <TouchableOpacity
             style={styles.cartButton}
-            onPress={() => alert(`${qty} items added to cart`)}
+            onPress={() => toast.show(`${qty} items added to cart`, { type: "success" })}
           >
             <Text style={styles.cartButtonText}>
               {pDetails?.quantity > 0 ? "ADD TO CART" : "OUT OF STOCK"}

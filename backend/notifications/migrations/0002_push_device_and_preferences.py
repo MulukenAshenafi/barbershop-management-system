@@ -1,0 +1,56 @@
+# Push devices and notification preferences for Expo push
+
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('notifications', '0001_initial'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='PushDevice',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('expo_push_token', models.CharField(max_length=200, unique=True)),
+                ('device_type', models.CharField(choices=[('ios', 'iOS'), ('android', 'Android')], max_length=20)),
+                ('is_active', models.BooleanField(default=True)),
+                ('language', models.CharField(default='en', max_length=10)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('last_used', models.DateTimeField(auto_now=True)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='push_devices', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'db_table': 'push_devices',
+            },
+        ),
+        migrations.AddIndex(
+            model_name='pushdevice',
+            index=models.Index(fields=['user', 'is_active'], name='push_devic_user_id_idx'),
+        ),
+        migrations.AddIndex(
+            model_name='pushdevice',
+            index=models.Index(fields=['expo_push_token'], name='push_devic_expo_token_idx'),
+        ),
+        migrations.CreateModel(
+            name='NotificationPreference',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('notifications_enabled', models.BooleanField(default=True)),
+                ('notify_booking_confirmations', models.BooleanField(default=True)),
+                ('notify_24h_reminders', models.BooleanField(default=True)),
+                ('notify_1h_reminders', models.BooleanField(default=True)),
+                ('notify_orders', models.BooleanField(default=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='notification_preference', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'db_table': 'notification_preferences',
+            },
+        ),
+    ]

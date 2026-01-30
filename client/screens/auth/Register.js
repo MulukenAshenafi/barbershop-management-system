@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Image,
   StyleSheet,
@@ -6,219 +6,219 @@ import {
   TouchableOpacity,
   View,
   Alert,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import axios from "axios";
-import InputBox from "../../components/Form/InputBox";
-import config from "../../config";
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import InputBox from '../../components/Form/InputBox';
+import Button from '../../components/common/Button';
+import Card from '../../components/common/Card';
+import { useToast } from '../../components/common/Toast';
+import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import api, { getApiErrorMessage } from '../../services/api';
+import { setAuth } from '../../services/auth';
+import { fontSizes, spacing, borderRadius, typography } from '../../theme';
+
+const defaultProfileImage =
+  'https://uxwing.com/wp-content/themes/uxwing/download/editing-user-action/signup-icon.png';
 
 const Register = ({ navigation }) => {
-  const defaultProfileImage =
-    "https://uxwing.com/wp-content/themes/uxwing/download/editing-user-action/signup-icon.png";
-
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [contact, setContact] = useState("");
-  const [location, setLocation] = useState("");
-  const [image, setImage] = useState(null); // State to hold the selected profile image
+  const toast = useToast();
+  const { colors } = useTheme();
+  const { checkAuth } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [contact, setContact] = useState('');
+  const [location, setLocation] = useState('');
+  const [image, setImage] = useState(null);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Function to handle image picking
   const handleImagePick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission required",
-        "We need media library permissions to select an image."
-      );
+    if (status !== 'granted') {
+      toast.show('Media library permission is needed to select a photo.', { type: 'error' });
       return;
     }
-
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 1,
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setImage(result.assets[0].uri); // Save the selected image URI
-    } else {
-      console.log("Image selection cancelled");
-    }
+    if (!result.canceled) setImage(result.assets[0].uri);
   };
 
   const handleSignUp = async () => {
     if (!name || !email || !password || !contact || !location) {
-      return Alert.alert("Validation Error", "Please fill in all fields");
+      toast.show('Please fill in all required fields', { type: 'error' });
+      return;
     }
-
+    setLoading(true);
+    setError(null);
     try {
       const formData = new FormData();
-      formData.append("name", name);
-      formData.append("email", email);
-      formData.append("password", password);
-      formData.append("phone", contact);
-      formData.append("location", location);
-
+      formData.append('name', name);
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('phone', contact);
+      formData.append('location', location);
       if (image) {
-        const uriParts = image.split(".");
+        const uriParts = image.split('.');
         const fileType = uriParts[uriParts.length - 1];
-        formData.append("file", {
+        formData.append('file', {
           uri: image,
           name: `profile-pic.${fileType}`,
           type: `image/${fileType}`,
         });
       }
-
-      const res = await axios.post(
-        `${config.apiBaseUrl}/customers/signup`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
+      const res = await api.post('customers/signup', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       setResponse(res.data);
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "An unknown error occurred.";
-      setError(errorMessage);
-      console.error("Registration Error:", errorMessage);
+      setError(getApiErrorMessage(err, 'An unknown error occurred.'));
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (response) {
-      if (response.success) {
-        Alert.alert("Success", "Registered Successfully");
-        navigation.navigate("login");
-      } else {
-        Alert.alert(
-          "Registration Error",
-          response.message || "An error occurred."
-        );
-      }
+    if (!response) return;
+    if (response.success && response.token) {
+      setAuth({
+        token: response.token,
+        refreshToken: response.refreshToken || null,
+        user: {
+          id: response.user?.id,
+          _id: response.user?.id,
+          name: response.user?.name,
+          email: response.user?.email,
+          role: response.user?.role,
+          profilePic: response.user?.profilePic,
+        },
+      });
+      toast.show('Account created. Welcome!', { type: 'success' });
+      checkAuth().then(() => {
+        navigation.reset({ index: 0, routes: [{ name: 'home' }] });
+      });
+    } else if (response.success) {
+      toast.show('Account created.', { type: 'success' });
+      navigation.navigate('login');
+    } else {
+      toast.show(response.message || 'Registration failed', { type: 'error' });
     }
+  }, [response, navigation, toast, checkAuth]);
 
-    if (error) {
-      Alert.alert("Registration Error", error || "An unknown error occurred.");
-    }
-  }, [response, error]);
+  useEffect(() => {
+    if (error) toast.show(error, { type: 'error' });
+  }, [error, toast]);
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={{ uri: image || defaultProfileImage }}
-        style={styles.image}
-      />
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>Create account</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Join Abush Barber Shop</Text>
+        </View>
 
-      <TouchableOpacity style={styles.imageButton} onPress={handleImagePick}>
-        <Text style={styles.imageButtonText}>
-          {image ? "Change Profile Picture" : "Select Profile Picture"}
-        </Text>
-      </TouchableOpacity>
-      <View style={{ alignItems: "center" }}>
-        <InputBox
-          placeholder="Enter your Name"
-          value={name}
-          setValue={setName}
-          autoComplete="name"
-        />
-        <InputBox
-          placeholder="Enter your Email"
-          value={email}
-          setValue={setEmail}
-          autoComplete="email"
-        />
-        <InputBox
-          placeholder="Enter your Password"
-          value={password}
-          setValue={setPassword}
-          secureTextEntry
-        />
-        <InputBox
-          placeholder="Enter your Contact Number"
-          value={contact}
-          setValue={setContact}
-          autoComplete="tel"
-        />
-        <InputBox
-          placeholder="Enter your Location"
-          value={location}
-          setValue={setLocation}
-        />
-      </View>
-      <View style={styles.btnContainer}>
-        <TouchableOpacity style={styles.logiBtn} onPress={handleSignUp}>
-          <Text style={styles.logiBtnText}>Sign Up</Text>
-        </TouchableOpacity>
-        <Text>
-          Already have an account?{" "}
-          <Text
-            style={styles.link}
-            onPress={() => navigation.navigate("login")}
+        <View style={styles.avatarWrap}>
+          <Image
+            source={{ uri: image || defaultProfileImage }}
+            style={styles.avatar}
+          />
+          <TouchableOpacity
+            style={[styles.avatarBtn, { backgroundColor: colors.primary }]}
+            onPress={handleImagePick}
+            activeOpacity={0.9}
           >
-            Login
+            <Text style={styles.avatarBtnText}>
+              {image ? 'Change photo' : 'Add photo'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Card style={styles.card}>
+          <InputBox placeholder="Full name" value={name} setValue={setName} autoComplete="name" />
+          <InputBox placeholder="Email" value={email} setValue={setEmail} autoComplete="email" />
+          <InputBox placeholder="Password" value={password} setValue={setPassword} inputType="password" />
+          <InputBox placeholder="Phone" value={contact} setValue={setContact} autoComplete="tel" />
+          <InputBox placeholder="Location" value={location} setValue={setLocation} />
+          <Button
+            title="Sign up"
+            onPress={handleSignUp}
+            loading={loading}
+            fullWidth
+            style={styles.primaryBtn}
+          />
+          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+            Already have an account?{' '}
+            <Text style={[styles.link, { color: colors.primary }]} onPress={() => navigation.navigate('login')}>
+              Sign in
+            </Text>
           </Text>
-        </Text>
-      </View>
-    </View>
+        </Card>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "center",
-    height: "100%",
-    padding: 20,
+  container: { flex: 1 },
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
-  image: {
-    height: 150,
-    width: 150,
-    borderRadius: 75,
-    resizeMode: "cover",
-    alignSelf: "center",
-    marginBottom: 20,
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  imageButton: {
-    backgroundColor: "#32CD32",
-    borderRadius: 5,
-    paddingVertical: 10,
-    alignItems: "center",
-    marginBottom: 20,
+  title: { ...typography.subtitle, marginBottom: spacing.xs },
+  subtitle: { ...typography.bodySmall },
+  avatarWrap: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  imageButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    resizeMode: 'cover',
+    marginBottom: spacing.sm,
   },
-  btnContainer: {
-    justifyContent: "center",
-    alignItems: "center",
+  avatarBtn: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
   },
-  logiBtn: {
-    backgroundColor: "#000000",
-    width: "80%",
-    justifyContent: "center",
-    height: 45,
-    borderRadius: 5,
-    marginTop: 20,
+  avatarBtnText: { color: '#fff', fontSize: fontSizes.sm, fontWeight: '600' },
+  card: {
+    padding: spacing.lg,
   },
-  logiBtnText: {
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 20,
-    color: "#ffffff",
+  primaryBtn: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
-  link: {
-    color: "blue",
-    fontWeight: "bold",
+  helperText: {
+    ...typography.bodySmall,
+    textAlign: 'center',
   },
+  link: { fontWeight: '600' },
 });
 
 export default Register;

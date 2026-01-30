@@ -1,47 +1,61 @@
+import React from 'react';
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
   TouchableOpacity,
-} from "react-native";
-import React from "react";
-import Layout from "../components/Layout/Layout";
-import { ServicesData } from "../data/ServicesData";
+} from 'react-native';
+import Layout from '../components/Layout/Layout';
+import Card from '../components/common/Card';
+import { ServicesData } from '../data/ServicesData';
+import { colors, spacing, typography, borderRadius } from '../theme';
 
 const Bookings = () => {
+  const services = Array.isArray(ServicesData) ? ServicesData : [];
+
   return (
     <Layout>
-      <View style={styles.container}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Service Categories */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Services</Text>
-            {ServicesData.map((service) => (
-              <View key={service.id} style={styles.serviceCard}>
-                <Text style={styles.serviceTitle}>{service.name}</Text>
-                <Text style={styles.serviceDescription}>
-                  {service.description}
-                </Text>
-                <TouchableOpacity style={styles.button}>
-                  <Text style={styles.buttonText}>Book Now</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-
-          {/* Help and Support */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Help & Support</Text>
-            <TouchableOpacity style={styles.button}>
-              <Text style={styles.buttonText}>Contact Support</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+      <View style={styles.header}>
+        <Text style={styles.title}>Bookings</Text>
+        <Text style={styles.subtitle}>Choose a service to book</Text>
       </View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Services</Text>
+          {services.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Text style={styles.emptyText}>Loading services…</Text>
+            </Card>
+          ) : (
+            services.map((service) => (
+              <Card key={service.id ?? service._id} style={styles.serviceCard}>
+                <Text style={styles.serviceTitle}>{service.name}</Text>
+                {service.description ? (
+                  <Text style={styles.serviceDescription}>{service.description}</Text>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.bookBtn}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.bookBtnText}>Book now</Text>
+                </TouchableOpacity>
+              </Card>
+            ))
+          )}
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Help & support</Text>
+          <Card style={styles.supportCard}>
+            <TouchableOpacity style={styles.supportBtn} activeOpacity={0.9}>
+              <Text style={styles.supportBtnText}>Contact support</Text>
+            </TouchableOpacity>
+          </Card>
+        </View>
+      </ScrollView>
     </Layout>
   );
 };
@@ -49,45 +63,69 @@ const Bookings = () => {
 export default Bookings;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
+  header: {
+    marginBottom: spacing.lg,
   },
-  scrollContainer: {
-    padding: 10,
+  title: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    ...typography.bodySmall,
+  },
+  scroll: {
+    paddingBottom: spacing.xxl,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
+    ...typography.bodySmall,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+    color: colors.textSecondary,
   },
   serviceCard: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: "#fff",
-    marginBottom: 10,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
   serviceTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
+    ...typography.body,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
   },
   serviceDescription: {
+    ...typography.bodySmall,
+    marginBottom: spacing.md,
+  },
+  bookBtn: {
+    backgroundColor: colors.secondary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignSelf: 'flex-start',
+  },
+  bookBtnText: {
+    color: colors.white,
+    fontWeight: '600',
     fontSize: 14,
-    color: "#555",
   },
-  button: {
-    backgroundColor: "#FF6347",
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
+  emptyCard: {
+    padding: spacing.lg,
+    alignItems: 'center',
   },
-  buttonText: {
-    color: "#fff",
-    textAlign: "center",
+  emptyText: {
+    ...typography.bodySmall,
+  },
+  supportCard: {
+    padding: spacing.md,
+  },
+  supportBtn: {
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  supportBtnText: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

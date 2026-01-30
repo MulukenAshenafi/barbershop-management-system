@@ -484,48 +484,97 @@ class OrderViewSet(viewsets.ModelViewSet):
         return filter_by_barbershop(queryset, barbershop_id)
     
     def create(self, request):
-        """Create order."""
+        """Create order with pessimistic locking on product stock (prevents oversell)."""
+        from django.db import transaction
         data = request.data
-        shipping_info = data.get('shippingInfo', {})
-        order_items = data.get('orderItems', [])
-        
-        # Get barbershop from request context
+        shipping_info = data.get('shipping_info') or data.get('shippingInfo') or {}
+        order_items = data.get('order_items') or data.get('orderItems') or []
         barbershop = getattr(request, 'barbershop', None)
-        
-        order = Order.objects.create(
-            barbershop=barbershop,
-            user=request.user,
-            shipping_address=shipping_info.get('address', ''),
-            shipping_city=shipping_info.get('city', ''),
-            shipping_country=shipping_info.get('country', ''),
-            payment_method=data.get('paymentMethod', 'COD'),
-            payment_info_id=data.get('paymentInfo', {}).get('id', ''),
-            payment_info_status=data.get('paymentInfo', {}).get('status', ''),
-            item_price=float(data.get('itemPrice', 0)),
-            tax=float(data.get('tax', 0)),
-            shipping_charges=float(data.get('shippingCharges', 0)),
-            total_amount=float(data.get('totalAmount', 0)),
-        )
-        
-        # Create order items and update stock
-        for item in order_items:
-            OrderItem.objects.create(
-                order=order,
-                product_id=item['product'],
-                name=item['name'],
-                price=float(item['price']),
-                quantity=int(item['quantity']),
-                image=item['image']
+
+        if not order_items:
+            return Response(
+                {'success': False, 'message': 'order_items is required'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            
-            # Update stock
-            product = Product.objects.get(id=item['product'])
-            product.stock -= int(item['quantity'])
-            product.save()
-        
+
+        try:
+            with transaction.atomic():
+                product_ids = [item.get('product') or item.get('productId') for item in order_items]
+                products = {
+                    p.id: p
+                    for p in Product.objects.select_for_update().filter(id__in=product_ids)
+                }
+                for item in order_items:
+                    pid = item.get('product') or item.get('productId')
+                    qty = int(item.get('quantity', 0))
+                    name = item.get('name', '')
+                    if not pid or qty <= 0:
+                        raise ValueError('Invalid order item')
+                    product = products.get(pid)
+                    if not product:
+                        return Response(
+                            {'success': False, 'message': f'Product {pid} not found'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    if product.stock < qty:
+                        return Response(
+                            {'success': False, 'message': f'Insufficient stock for {product.name}'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                order = Order.objects.create(
+                    barbershop=barbershop,
+                    user=request.user,
+                    shipping_address=shipping_info.get('address', ''),
+                    shipping_city=shipping_info.get('city', ''),
+                    shipping_country=shipping_info.get('country', ''),
+                    payment_method=data.get('payment_method') or data.get('paymentMethod') or 'COD',
+                    payment_info_id=(data.get('payment_info') or data.get('paymentInfo') or {}).get('id', ''),
+                    payment_info_status=(data.get('payment_info') or data.get('paymentInfo') or {}).get('status', ''),
+                    item_price=float(data.get('item_price') or data.get('itemPrice') or 0),
+                    tax=float(data.get('tax') or 0),
+                    shipping_charges=float(data.get('shipping_charges') or data.get('shippingCharges') or 0),
+                    total_amount=float(data.get('total_amount') or data.get('totalAmount') or 0),
+                )
+                for item in order_items:
+                    pid = item.get('product') or item.get('productId')
+                    qty = int(item.get('quantity', 0))
+                    product = products[pid]
+                    OrderItem.objects.create(
+                        order=order,
+                        product_id=pid,
+                        name=item.get('name', product.name),
+                        price=float(item.get('price', product.price)),
+                        quantity=qty,
+                        image=item.get('image', ''),
+                    )
+                    product.stock -= qty
+                    product.save(update_fields=['stock'])
+        except ValueError as e:
+            return Response(
+                {'success': False, 'message': str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.get_serializer(order)
+        # Push: notify shop admins of new order
+        try:
+            from notifications.services import PushNotificationService
+            if barbershop:
+                PushNotificationService.notify_barbershop_staff(
+                    barbershop,
+                    'New Order',
+                    f'Order #{order.id} - {order.user.name} - {order.total_amount}',
+                    {'type': 'order_update', 'order_id': str(order.id)},
+                    role_filter=['Admin'],
+                )
+        except Exception:
+            pass
         return Response({
             'success': True,
-            'message': 'Order Placed Successfully'
+            'message': 'Order Placed Successfully',
+            'order': serializer.data,
+            'orderId': str(order.id),
         }, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['get'])
@@ -581,7 +630,21 @@ class OrderViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         order.save()
-        
+
+        # Push: notify customer of order status update
+        try:
+            from notifications.services import PushNotificationService
+            status_label = 'shipped' if order.order_status == 'shipped' else 'delivered'
+            PushNotificationService.notify_user(
+                order.user,
+                'Order Update',
+                f'Your order #{order.id} has been {status_label}.',
+                {'type': 'order_update', 'order_id': str(order.id)},
+                category='order_update',
+            )
+        except Exception:
+            pass
+
         return Response({
             'success': True,
             'message': 'order status updated'

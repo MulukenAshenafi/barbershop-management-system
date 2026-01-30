@@ -8,52 +8,34 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import config from "../../config.js";
+import api from "../../services/api";
 
 const SetPreferences_Specialization = ({ route, navigation }) => {
-  const { user } = route.params;
+  const { user } = route.params ?? {};
   const [input, setInput] = useState(
-    user.role === "Customer" ? user.preferences : user.specialization
+    user?.role === "Customer" ? (user.preferences ?? "") : (user?.specialization ?? "")
   );
   const [error, setError] = useState(null);
 
-  // Update preferences or specialization
   const handleUpdate = async () => {
-    if (!input) {
+    if (!input?.trim()) {
       return Alert.alert("Validation Error", "Please provide a value");
     }
-
     try {
-      const token = await AsyncStorage.getItem("token");
       const endpoint =
-        user.role === "Customer" ? "/set-preferences" : "/set-specialization";
-      const res = await axios.post(
-        `${config.apiBaseUrl}/customers${endpoint}`,
-        {
-          [user.role === "Customer" ? "preferences" : "specialization"]: input,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
+        user?.role === "Customer" ? "customers/set-preferences" : "customers/set-specialization";
+      const res = await api.post(endpoint, {
+        [user?.role === "Customer" ? "preferences" : "specialization"]: input.trim(),
+      });
       if (res.data.success) {
         Alert.alert("Success", res.data.message);
         navigation.goBack();
       } else {
-        Alert.alert("Error", res.data.message);
+        Alert.alert("Error", res.data.message || "Update failed");
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "An unknown error occurred.";
-      setError(errorMessage);
-      console.error("Update Error:", errorMessage);
+      const msg = err.response?.data?.message || err.message || "An unknown error occurred.";
+      setError(msg);
     }
   };
 

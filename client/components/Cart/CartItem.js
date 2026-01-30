@@ -1,35 +1,74 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useState } from "react";
+import React from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  colors,
+  fontSizes,
+  spacing,
+  borderRadius,
+  shadows,
+  typography,
+  touchTargetMin,
+} from '../../theme';
 
-const CartItem = ({ item }) => {
-  const [qty, setQty] = useState(item.quantity || 1);
+const CartItem = ({ item, onUpdateQty, onRemove }) => {
+  const qty = item.quantity || 1;
+  const imageUri = item.image ?? item.imageUrl ?? '';
 
-  const handleAddQty = () => {
-    if (qty === 10) return alert("You can't add more than 10 items.");
-    setQty((prev) => prev + 1);
+  const handleAdd = () => {
+    if (qty < 10) onUpdateQty?.(qty + 1);
   };
-
-  const handleMinusQty = () => {
-    if (qty <= 1) return;
-    setQty((prev) => prev - 1);
+  const handleMinus = () => {
+    if (qty > 1) onUpdateQty?.(qty - 1);
+    else onRemove?.();
   };
 
   return (
     <View style={styles.container}>
-      <Image source={{ uri: item?.imageUrl }} style={styles.image} />
+      <Image
+        source={imageUri ? { uri: imageUri } : require('../../assets/icon.png')}
+        style={styles.image}
+        resizeMode="cover"
+      />
       <View style={styles.details}>
-        <Text style={styles.name}>{item?.name}</Text>
-        <Text style={styles.description}>{item?.description}</Text>
-        <Text style={styles.price}>${item?.price.toFixed(2)}</Text>
-      </View>
-      <View style={styles.btnContainer}>
-        <TouchableOpacity style={styles.btnQty} onPress={handleMinusQty}>
-          <Text style={styles.btnQtyText}>-</Text>
-        </TouchableOpacity>
-        <Text style={styles.qtyText}>{qty}</Text>
-        <TouchableOpacity style={styles.btnQty} onPress={handleAddQty}>
-          <Text style={styles.btnQtyText}>+</Text>
-        </TouchableOpacity>
+        <Text style={styles.name} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text style={styles.price}>
+          {(item.price || 0).toFixed(2)} ETB × {qty}
+        </Text>
+        <View style={styles.actions}>
+          <View style={styles.qtyRow}>
+            <TouchableOpacity
+              style={styles.qtyBtn}
+              onPress={handleMinus}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.qtyBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.qtyText}>{qty}</Text>
+            <TouchableOpacity
+              style={[styles.qtyBtn, qty >= 10 && styles.qtyBtnDisabled]}
+              onPress={handleAdd}
+              disabled={qty >= 10}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.qtyBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            onPress={onRemove}
+            style={styles.removeBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.removeText}>Remove</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -39,54 +78,75 @@ export default CartItem;
 
 const styles = StyleSheet.create({
   container: {
-    margin: 10,
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
+    marginBottom: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    ...shadows.sm,
   },
   image: {
     height: 80,
     width: 80,
-    resizeMode: "contain",
-    marginRight: 10,
+    borderRadius: borderRadius.md,
+    marginRight: spacing.md,
+    backgroundColor: colors.gray200,
   },
   details: {
     flex: 1,
   },
   name: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  description: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: fontSizes.base,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
   },
   price: {
-    fontSize: 14,
-    fontWeight: "bold",
-    marginVertical: 5,
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
-  btnContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  btnQty: {
-    backgroundColor: "#f0f0f0",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  btnQtyText: {
-    fontSize: 18,
-    fontWeight: "bold",
+  qtyBtn: {
+    backgroundColor: colors.gray200,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  qtyBtnDisabled: {
+    opacity: 0.5,
+  },
+  qtyBtnText: {
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+    color: colors.text,
   },
   qtyText: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: fontSizes.base,
+    fontWeight: '600',
+    minWidth: 28,
+    textAlign: 'center',
+    color: colors.text,
+  },
+  removeBtn: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  removeText: {
+    fontSize: fontSizes.sm,
+    color: colors.error,
+    fontWeight: '600',
   },
 });

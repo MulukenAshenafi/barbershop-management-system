@@ -23,7 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """Serializer for user registration."""
     password = serializers.CharField(write_only=True, min_length=6)
-    profilePic = serializers.SerializerMethodField()
+    profilePic = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
         model = User
@@ -33,6 +33,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'password': {'write_only': True},
+            'role': {'read_only': True},
+            'id': {'read_only': True},
         }
     
     def create(self, validated_data):

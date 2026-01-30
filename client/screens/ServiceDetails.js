@@ -1,109 +1,149 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useEffect, useState } from "react";
-import { useNavigation } from "@react-navigation/native"; // Import navigation hook
-import { ServicesData } from "../data/ServicesData";
-import Layout from "../components/Layout/Layout";
+import React, { useEffect, useState } from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ScrollView,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import Layout from '../components/Layout/Layout';
+import api from '../services/api';
+import Button from '../components/common/Button';
+import Card from '../components/common/Card';
+import { LoadingScreen } from '../components/common/LoadingScreen';
+import {
+  colors,
+  fontSizes,
+  spacing,
+  borderRadius,
+  typography,
+} from '../theme';
 
 const ServiceDetails = ({ route }) => {
-  const [serviceDetails, setServiceDetails] = useState({});
+  const [serviceDetails, setServiceDetails] = useState(route.params?.service ?? {});
+  const [loading, setLoading] = useState(!route.params?.service && !!route.params?._id);
   const { params } = route;
-  const navigation = useNavigation(); // Use navigation hook
+  const navigation = useNavigation();
 
   useEffect(() => {
-    const getService = ServicesData.find((s) => s?._id === params?._id);
-    setServiceDetails(getService);
-  }, [params?._id]);
+    if (params?.service) {
+      setServiceDetails(params.service);
+      return;
+    }
+    const id = params?._id;
+    if (!id) return;
+    let cancelled = false;
+    api.get(`service/${id}`)
+      .then((res) => {
+        if (!cancelled && res.data?.service) setServiceDetails(res.data.service);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [params?._id, params?.service]);
 
   const handleBookService = () => {
-    // Navigate to BookService screen and pass service details as parameters
-    navigation.navigate("BookService", {
-      serviceId: serviceDetails?._id,
+    navigation.navigate('BookService', {
+      serviceId: serviceDetails?._id ?? serviceDetails?.id,
       serviceName: serviceDetails?.name,
       servicePrice: serviceDetails?.price,
-      serviceImage: serviceDetails?.imageUrl,
+      serviceImage: serviceDetails?.imageUrl ?? serviceDetails?.image?.[0]?.url,
     });
   };
 
+  if (loading) {
+    return (
+      <Layout>
+        <LoadingScreen message="Loading service…" />
+      </Layout>
+    );
+  }
+
+  const imageUrl = serviceDetails?.imageUrl ?? serviceDetails?.image?.[0]?.url;
+
   return (
     <Layout>
-      <View style={styles.container}>
-        <Image
-          source={{ uri: serviceDetails?.imageUrl }}
-          style={styles.image}
-          resizeMode="contain"
-        />
-        <View style={styles.detailsContainer}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card style={styles.imageCard} noShadow>
+          <Image
+            source={imageUrl ? { uri: imageUrl } : require('../assets/icon.png')}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        </Card>
+        <Card style={styles.detailsCard}>
           <Text style={styles.title}>{serviceDetails?.name}</Text>
-          <Text style={styles.price}>Price: {serviceDetails?.price} birr</Text>
-          <Text style={styles.duration}>
-            Duration: {serviceDetails?.duration}
-          </Text>
-          <Text style={styles.desc}>
-            Description: {serviceDetails?.description}
-          </Text>
-          <TouchableOpacity
-            style={styles.bookButton}
+          <View style={styles.metaRow}>
+            <Text style={styles.price}>{serviceDetails?.price ?? 0} ETB</Text>
+            {serviceDetails?.duration ? (
+              <Text style={styles.duration}>{serviceDetails.duration}</Text>
+            ) : null}
+          </View>
+          {serviceDetails?.description ? (
+            <Text style={styles.desc}>{serviceDetails.description}</Text>
+          ) : null}
+          <Button
+            title="Book now"
             onPress={handleBookService}
-          >
-            <Text style={styles.bookButtonText}>BOOK NOW</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            variant="primary"
+            fullWidth
+            style={styles.bookBtn}
+          />
+        </Card>
+      </ScrollView>
     </Layout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    margin: 10,
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  scroll: {
+    paddingBottom: spacing.xxl,
+  },
+  imageCard: {
+    padding: 0,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
   image: {
-    height: 200,
-    width: "100%",
-    borderRadius: 10,
+    height: 220,
+    width: '100%',
+    borderRadius: 0,
   },
-  detailsContainer: {
-    marginTop: 15,
+  detailsCard: {
+    padding: spacing.lg,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 5,
+    ...typography.sectionTitle,
+    marginBottom: spacing.sm,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.md,
   },
   price: {
-    fontSize: 18,
-    color: "#444",
-    marginBottom: 5,
+    fontSize: fontSizes.lg,
+    fontWeight: '700',
+    color: colors.secondary,
   },
   duration: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 10,
+    ...typography.bodySmall,
   },
   desc: {
-    fontSize: 14,
-    textAlign: "justify",
-    marginBottom: 20,
+    ...typography.body,
+    marginBottom: spacing.lg,
+    lineHeight: 22,
   },
-  bookButton: {
-    backgroundColor: "#FF6347",
-    borderRadius: 25,
-    height: 50,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bookButtonText: {
-    color: "#ffffff",
-    fontWeight: "bold",
-    fontSize: 18,
+  bookBtn: {
+    marginTop: spacing.sm,
   },
 });
 

@@ -95,7 +95,10 @@ class Booking(models.Model):
     customer_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+    # Push reminder tracking (Celery beat sends 24h/1h before)
+    notification_sent_24h = models.BooleanField(default=False)
+    notification_sent_1h = models.BooleanField(default=False)
+
     class Meta:
         db_table = 'bookings'
         indexes = [

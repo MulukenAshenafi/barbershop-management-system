@@ -1,173 +1,146 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Alert,
-  Dimensions,
   Image,
-  StatusBar,
-} from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import InputBox from "../../components/Form/InputBox";
-import config from "../../config";
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import InputBox from '../../components/Form/InputBox';
+import Button from '../../components/common/Button';
+import Card from '../../components/common/Card';
+import { useToast } from '../../components/common/Toast';
+import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { loginWithEmail } from '../../services/authService';
+import { fontSizes, spacing, borderRadius, typography } from '../../theme';
 
-const abushLogo = require("../../assets/a-logo-for-a-abush-barber-shop.jpeg");
-
-const { width } = Dimensions.get("window");
+const abushLogo = require('../../assets/a-logo-for-a-abush-barber-shop.jpeg');
 
 const Login = ({ navigation }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const { colors } = useTheme();
+  const toast = useToast();
+  const { checkAuth } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      return Alert.alert(
-        "Validation Error",
-        "Please enter username and password"
-      );
-    }
-
-    try {
-      const response = await axios.post(
-        `${config.apiBaseUrl}/customers/login`,
-        {
-          username,
-          password,
-        }
-      );
-
-      if (response.data.success) {
-        const user = response.data.user || {};
-
-        await AsyncStorage.setItem(
-          "customerData",
-          JSON.stringify({
-            customerId: user.id || "", // Store the customer ID
-            customerName: user.name || "Unknown",
-            customerEmail: user.email || "",
-            customerRole: user.role || "",
-            customerPhone: user.phone || "",
-            customerProfilePic:
-              user.profilePic?.[0]?.url ||
-              "https://cdn-icons-png.flaticon.com/512/3177/3177440.png", // Extract the URL from profilePic array
-
-            customerLocation: user.location || "",
-            customerPreferences: user.preferences || "",
-            customerSpecialization: user.specialization || "",
-          })
-        );
-
-        Alert.alert("Success", "Login Successfully");
-        navigation.navigate("home");
-      } else {
-        Alert.alert("Login Error", response.data.message || "Unknown error");
-      }
-    } catch (error) {
-      const errorMessage =
-        error.response?.data?.message ||
-        "An error occurred while trying to log in.";
-      Alert.alert("Login Error", errorMessage);
+    setLoading(true);
+    const { success, error } = await loginWithEmail(username, password);
+    setLoading(false);
+    if (success) {
+      toast.show('Login successful', { type: 'success' });
+      await checkAuth();
+      navigation.reset({ index: 0, routes: [{ name: 'home' }] });
+    } else if (error) {
+      toast.show(error || 'Invalid credentials', { type: 'error' });
     }
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.logoContainer}>
+          <Image source={abushLogo} style={styles.logo} />
+          <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome back</Text>
+          <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>Sign in to continue</Text>
+        </View>
 
-      <View style={styles.logoContainer}>
-        <Image source={abushLogo} style={styles.logo} />
-      </View>
-      <View style={{ alignItems: "center" }}>
-        <InputBox
-          placeholder={"Enter your Username"}
-          value={username}
-          setValue={setUsername}
-          autoComplete={"username"}
-        />
-
-        <InputBox
-          placeholder={"Enter your Password"}
-          value={password}
-          setValue={setPassword}
-          inputType="password" // Now using inputType for password input
-        />
-      </View>
-
-      <View style={styles.btnContainer}>
-        <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-          <Text style={styles.loginBtnText}>Login</Text>
-        </TouchableOpacity>
-
-        <Text>
-          I Have No Account?{"  "}
-          <Text
-            style={styles.link}
-            onPress={() => navigation.navigate("register")}
-          >
-            Sign Up
+        <Card style={styles.card}>
+          <InputBox
+            placeholder="Username"
+            value={username}
+            setValue={setUsername}
+            autoComplete="username"
+          />
+          <InputBox
+            placeholder="Password"
+            value={password}
+            setValue={setPassword}
+            inputType="password"
+          />
+          <Button
+            title="Sign in"
+            onPress={handleLogin}
+            loading={loading}
+            fullWidth
+            style={styles.primaryBtn}
+          />
+          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+            Don't have an account?{' '}
+            <Text
+              style={[styles.link, { color: colors.primary }]}
+              onPress={() => navigation.navigate('register')}
+            >
+              Sign up
+            </Text>
           </Text>
-        </Text>
-      </View>
+        </Card>
 
-      {/* Copyright Section */}
-      <Text style={styles.copyright}>
-        ©2024 Abush Barber Shop. All rights reserved.
-      </Text>
-    </View>
+        <Text style={[styles.copyright, { color: colors.textSecondary }]}>
+          ©{new Date().getFullYear()} Abush Barber Shop
+        </Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "center",
-
-    height: "100%",
-    padding: 20,
-    backgroundColor: "#fff",
+  container: { flex: 1 },
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xl,
   },
   logoContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: StatusBar.currentHeight || 20,
-    marginBottom: 30, // Increased margin for spacing
+    alignItems: 'center',
+    marginBottom: spacing.xl,
   },
   logo: {
-    width: 150, // Increased size
-    height: 150, // Increased size
-    borderRadius: 75, // Adjusted to maintain circular shape
-    resizeMode: "contain",
+    width: 100,
+    height: 100,
+    borderRadius: borderRadius.lg,
+    resizeMode: 'contain',
+    marginBottom: spacing.md,
   },
-  btnContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
+  welcomeTitle: {
+    ...typography.subtitle,
+    marginBottom: spacing.xs,
   },
-  loginBtn: {
-    backgroundColor: "#000000",
-    width: "80%",
-    justifyContent: "center",
-    height: 40,
-    borderRadius: 10,
-    marginVertical: 20,
+  welcomeSubtitle: {
+    ...typography.bodySmall,
   },
-  loginBtnText: {
-    color: "#ffffff",
-    textAlign: "center",
-    textTransform: "uppercase",
-    fontSize: 18,
-    fontWeight: "500",
+  card: {
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  link: {
-    color: "red",
-    textDecorationLine: "underline",
+  primaryBtn: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
+  helperText: {
+    ...typography.bodySmall,
+    textAlign: 'center',
+  },
+  link: { fontWeight: '600' },
   copyright: {
-    textAlign: "center",
-    color: "gray",
-    marginTop: 20,
+    ...typography.caption,
+    textAlign: 'center',
+    marginTop: spacing.lg,
   },
 });
 

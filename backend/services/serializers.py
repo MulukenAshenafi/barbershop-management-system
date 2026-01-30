@@ -10,10 +10,10 @@ class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = [
-            '_id', 'name', 'description', 'price', 'duration',
+            'name', 'description', 'price', 'duration',
             'category', 'image', 'imageUrl', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['_id', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
     
     def get_image(self, obj):
         return obj.image
@@ -54,10 +54,10 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            '_id', 'name', 'description', 'price', 'stock', 'category',
+            'name', 'description', 'price', 'stock', 'category',
             'images', 'rating', 'num_reviews', 'reviews', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['_id', 'rating', 'num_reviews', 'created_at', 'updated_at']
+        read_only_fields = ['rating', 'num_reviews', 'created_at', 'updated_at']
     
     def get_images(self, obj):
         return [{'public_id': img.public_id, 'url': img.image_url} for img in obj.images.all()]
@@ -70,47 +70,29 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    """Order item serializer."""
-    
+    """Order item serializer (snake_case; CamelCaseJSONRenderer handles response)."""
     class Meta:
         model = OrderItem
         fields = ['id', 'name', 'price', 'quantity', 'image', 'product']
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    """Order serializer."""
-    orderItems = OrderItemSerializer(source='order_items', many=True, read_only=True)
-    shippingInfo = serializers.SerializerMethodField()
-    paymentInfo = serializers.SerializerMethodField()
-    
+    """Order serializer. Uses model field names; CamelCase renderer/parser handle frontend."""
+    order_items = OrderItemSerializer(many=True, read_only=True)
+
     class Meta:
         model = Order
         fields = [
-            '_id', 'user', 'shippingInfo', 'orderItems', 'paymentMethod',
-            'paymentInfo', 'paidAt', 'itemPrice', 'tax', 'shippingCharges',
-            'totalAmount', 'orderStatus', 'deliveredAt', 'created_at', 'updated_at'
+            'id', 'user', 'shipping_address', 'shipping_city', 'shipping_country',
+            'order_items', 'payment_method', 'payment_info_id', 'payment_info_status',
+            'paid_at', 'item_price', 'tax', 'shipping_charges', 'total_amount',
+            'order_status', 'delivered_at', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['_id', 'created_at', 'updated_at']
-    
-    def get_shippingInfo(self, obj):
-        return {
-            'address': obj.shipping_address,
-            'city': obj.shipping_city,
-            'country': obj.shipping_country
-        }
-    
-    def get_paymentInfo(self, obj):
-        return {
-            'id': obj.payment_info_id or '',
-            'status': obj.payment_info_status or ''
-        }
-    
+        read_only_fields = ['created_at', 'updated_at']
+
     def to_representation(self, instance):
-        """Convert id to _id for frontend compatibility."""
         data = super().to_representation(instance)
         data['_id'] = str(instance.id)
-        data['paidAt'] = instance.paid_at.isoformat() if instance.paid_at else None
-        data['deliveredAt'] = instance.delivered_at.isoformat() if instance.delivered_at else None
         return data
 
 
@@ -119,8 +101,8 @@ class CategorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Category
-        fields = ['_id', 'name', 'created_at', 'updated_at']
-        read_only_fields = ['_id', 'created_at', 'updated_at']
+        fields = ['name', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
     
     def to_representation(self, instance):
         """Convert id to _id for frontend compatibility."""

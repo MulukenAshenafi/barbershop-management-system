@@ -1,87 +1,84 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
-import { useNavigation } from "@react-navigation/native";
+import React from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import {
+  colors,
+  fontSizes,
+  spacing,
+  borderRadius,
+  shadows,
+  typography,
+} from '../../theme';
 
 const ServiceCard = ({ s }) => {
   const navigation = useNavigation();
+  const name = s?.name ?? '';
+  const desc = s?.description ?? '';
+  const truncatedDesc = desc.length > 35 ? `${desc.substring(0, 35)}…` : desc;
 
-  const handleMoreButton = (id) => {
-    navigation.navigate("serviceDetails", { _id: id });
+  const handleMoreButton = () => {
+    navigation.navigate('serviceDetails', { _id: s._id ?? s.id, service: s });
   };
 
   return (
     <View style={styles.card}>
       <Image
         style={styles.cardImage}
-        resizeMode="contain"
+        resizeMode="cover"
         source={{ uri: s?.imageUrl }}
       />
-      <Text style={styles.cardTitle}>{s?.name}</Text>
-      <Text style={styles.cardDescription}>
-        {s?.description.substring(0, 30)}...more
-      </Text>
-      <View style={styles.BtnContainer}>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => handleMoreButton(s._id)}
-        >
-          <Text style={styles.btnText}>Details</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.cardTitle} numberOfLines={2}>{name}</Text>
+      <Text style={styles.cardDescription} numberOfLines={2}>{truncatedDesc}</Text>
+      <TouchableOpacity
+        style={styles.btn}
+        onPress={handleMoreButton}
+        activeOpacity={0.9}
+      >
+        <Text style={styles.btnText}>Details</Text>
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginVertical: 10,
-    marginHorizontal: 8,
-    width: 150,
-    padding: 8,
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    width: 160,
+    marginHorizontal: spacing.sm,
+    marginVertical: spacing.xs,
+    padding: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
   },
   cardImage: {
     height: 100,
-    width: "100%",
-    marginBottom: 8,
-    borderRadius: 10,
+    width: '100%',
+    marginBottom: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.gray200,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    marginBottom: 5,
-    textAlign: "center",
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+    color: colors.text,
   },
   cardDescription: {
-    fontSize: 12,
-    textAlign: "left",
-  },
-  BtnContainer: {
-    marginTop: 5,
-    flexDirection: "row",
-    justifyContent: "center", // Center the button now that there is only one
-    alignItems: "center",
+    fontSize: fontSizes.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   btn: {
-    backgroundColor: "#000",
-    height: 30,
-    width: 70,
-    borderRadius: 15,
-    justifyContent: "center",
+    backgroundColor: colors.primary,
+    height: 36,
+    borderRadius: borderRadius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   btnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontSize: 12,
-    fontWeight: "bold",
+    color: colors.white,
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
   },
 });
 

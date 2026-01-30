@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View, Button } from "react-native";
+import { shadows } from "../theme";
 
 const Confirmation = ({ route, navigation }) => {
   const { bookingData, serviceName, paymentStatus, totalAmount, barberName } =
@@ -52,10 +53,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    ...shadows.md,
   },
   infoText: {
     fontSize: 18,

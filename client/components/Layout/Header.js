@@ -1,64 +1,68 @@
+import React, { useState } from 'react';
 import {
   StyleSheet,
-  Text,
   TextInput,
-  TouchableOpacity,
   View,
-} from "react-native";
-import React, { useState } from "react";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import { fontSizes, spacing, borderRadius, touchTargetMin } from '../../theme';
 
 const Header = () => {
-  const [searchText, setSearchText] = useState("");
-  //function for search
+  const { colors } = useTheme();
+  const [searchText, setSearchText] = useState('');
   const handleSearch = () => {
-    console.log(searchText);
-    setSearchText("");
+    if (__DEV__) console.log(searchText);
+    setSearchText('');
   };
 
   return (
-    <View style={{ height: 90, marginTop: 20, backgroundColor: "lightgray" }}>
-      <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.searchWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TextInput
-          style={styles.inputBox}
+          style={[styles.input, { color: colors.text }]}
+          placeholder="Search services or products..."
+          placeholderTextColor={colors.textSecondary}
           value={searchText}
-          onChangeText={(text) => setSearchText(text)}
+          onChangeText={setSearchText}
+          returnKeyType="search"
+          onSubmitEditing={handleSearch}
         />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-          <FontAwesome name="search" style={styles.icon} />
+        <TouchableOpacity
+          style={styles.searchBtn}
+          onPress={handleSearch}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <FontAwesome name="search" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-export default Header;
-
 const styles = StyleSheet.create({
   container: {
-    display: "flex",
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    minHeight: Math.max(touchTargetMin, 44),
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+  },
+  input: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
+    fontSize: fontSizes.base,
+    paddingVertical: Platform.OS === 'ios' ? spacing.sm : 0,
   },
-  inputBox: {
-    borderWidth: 0.3,
-    width: "100%",
-    position: "absolute",
-    left: 15,
-    height: 40,
-    color: "#000000",
-    backgroundColor: "#ffffff",
-    paddingLeft: 20,
-    fontSize: 16,
-  },
-  searchBtn: {
-    position: "absolute",
-    left: "95%",
-  },
-  icon: {
-    color: "#000000",
-    fontSize: 18,
-  },
+  searchBtn: { padding: spacing.sm, justifyContent: 'center', alignItems: 'center' },
 });
+
+export default Header;

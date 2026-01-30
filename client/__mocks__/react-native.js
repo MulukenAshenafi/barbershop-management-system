@@ -1,0 +1,11 @@
+const React = require('react');
+const RN = jest.requireActual('react-native');
+RN.View = RN.View || (({ children }) => children);
+RN.Text = RN.Text || (({ children }) => children);
+RN.TouchableOpacity = RN.TouchableOpacity || (({ children }) => children);
+RN.ScrollView = RN.ScrollView || (({ children }) => children);
+RN.ActivityIndicator = RN.ActivityIndicator || (() => null);
+RN.StyleSheet = { create: (obj) => obj };
+RN.Animated = { View: RN.View, Value: jest.fn(), timing: jest.fn(), spring: jest.fn() };
+RN.useColorScheme = () => 'light';
+module.exports = RN;

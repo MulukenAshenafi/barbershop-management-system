@@ -13,6 +13,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+try:
+    import cloudinary.uploader
+    HAS_CLOUDINARY = True
+except ImportError:
+    HAS_CLOUDINARY = False
+
 User = get_user_model()
 
 
@@ -21,10 +27,17 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action in ('signup', 'login'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         """Filter queryset based on user role."""
         user = self.request.user
+        if not user.is_authenticated:
+            return User.objects.none()
         if user.role == 'Admin':
             return User.objects.all()
         elif user.role == 'Customer':
@@ -34,30 +47,61 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def signup(self, request):
-        """Customer registration endpoint."""
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save(role='Customer')
-            token = RefreshToken.for_user(user)
-            
+        """Customer registration endpoint. Accepts JSON or multipart/form-data."""
+        # Normalize input: multipart sends all values as strings; only pass expected fields
+        data = {}
+        for key in ('name', 'email', 'password', 'phone', 'location'):
+            val = request.data.get(key)
+            if val is not None:
+                data[key] = val if isinstance(val, str) else str(val)
+        serializer = UserRegistrationSerializer(data=data)
+        if not serializer.is_valid():
+            errors = serializer.errors
+            first_msg = 'Validation failed'
+            for _k, v in errors.items():
+                if isinstance(v, list) and v:
+                    first_msg = str(v[0])
+                    break
+                if isinstance(v, str):
+                    first_msg = v
+                    break
             return Response({
-                'success': True,
-                'message': 'Customer registered successfully.',
-                'user': {
-                    'id': str(user.id),
-                    'name': user.name,
-                    'email': user.email,
-                    'role': user.role,
-                    'profilePic': user.profile_pic,
-                },
-                'token': str(token.access_token),
-            }, status=status.HTTP_201_CREATED)
-        
+                'success': False,
+                'message': first_msg,
+                'errors': errors,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.save(role='Customer')
+        # Optional profile image upload (only if Cloudinary is fully configured)
+        if HAS_CLOUDINARY and request.FILES.get('file'):
+            from django.conf import settings
+            cloud_cfg = getattr(settings, 'CLOUDINARY_STORAGE', {}) or {}
+            api_key = (cloud_cfg.get('API_KEY') or '').strip()
+            api_secret = (cloud_cfg.get('API_SECRET') or '').strip()
+            cloud_name = (cloud_cfg.get('CLOUD_NAME') or '').strip()
+            if api_key and api_secret and cloud_name:
+                try:
+                    upload_result = cloudinary.uploader.upload(
+                        request.FILES['file'],
+                        folder='accounts/profiles',
+                    )
+                    user.profile_pic_url = upload_result.get('secure_url')
+                    user.profile_pic_public_id = upload_result.get('public_id')
+                    user.save(update_fields=['profile_pic_url', 'profile_pic_public_id'])
+                except Exception as e:
+                    logger.warning('Profile image upload failed: %s', e)
+        token = RefreshToken.for_user(user)
         return Response({
-            'success': False,
-            'message': 'Registration failed.',
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'success': True,
+            'message': 'Customer registered successfully.',
+            'user': {
+                'id': str(user.id),
+                'name': user.name,
+                'email': user.email,
+                'role': user.role,
+                'profilePic': user.profile_pic,
+            },
+            'token': str(token.access_token),
+        }, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):

@@ -13,9 +13,13 @@ requests==2.31.0
 firebase-admin==6.5.0
 # API Documentation
 drf-spectacular==0.27.1
+# CamelCase JSON for frontend compatibility
+djangorestframework-camel-case==1.4.2
 # Caching
 django-redis==5.4.0
 redis==5.0.1
+# JSON schema validation for opening_hours
+jsonschema==4.20.0
 # Testing
 pytest==7.4.3
 pytest-django==4.7.0
@@ -23,3 +27,6 @@ pytest-cov==4.1.0
 factory-boy==3.3.0
 # Production WSGI Server
 gunicorn==21.2.0
+# Celery (optional, for booking reminder pushes)
+celery==5.3.4
+django-celery-beat==2.5.0

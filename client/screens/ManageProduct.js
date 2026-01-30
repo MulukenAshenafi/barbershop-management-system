@@ -12,7 +12,8 @@ import {
 } from "react-native";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
+import { FontAwesome } from "@expo/vector-icons";
+import { shadows } from "../theme";
 
 // Define the backend API endpoint
 const API_URL = "http://10.139.55.179:8080/api/products"; // Update this with your actual API URL
@@ -121,7 +122,7 @@ const ManageProduct = ({ navigation }) => {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: "images",
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
@@ -236,9 +237,9 @@ const styles = StyleSheet.create({
     padding: 15,
     marginVertical: 8,
     borderRadius: 10,
-    elevation: 3,
     flexDirection: "row",
     alignItems: "center",
+    ...shadows.sm,
   },
   productImage: {
     width: 60,

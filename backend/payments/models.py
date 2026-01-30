@@ -56,6 +56,9 @@ class Payment(models.Model):
     currency = models.CharField(max_length=3, default='ETB')  # Ethiopian Birr for Chapa
     payment_method = models.CharField(max_length=50)  # Chapa, Stripe, Cash, etc.
     
+    # Idempotency: prevent double-charging (client sends Idempotency-Key header)
+    idempotency_key = models.CharField(max_length=64, blank=True, null=True, unique=True, db_index=True)
+
     # Chapa payment gateway fields
     chapa_transaction_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
     chapa_reference = models.CharField(max_length=255, blank=True, null=True)
@@ -78,6 +81,7 @@ class Payment(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['chapa_transaction_id']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['status', 'created_at']),
         ]
     
     def __str__(self):

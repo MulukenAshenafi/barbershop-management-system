@@ -20,7 +20,7 @@ const ServiceList = () => {
         const res = await axios.get(`${config.apiBaseUrl}/service/get-all`, {
           headers: { "Content-Type": "application/json" },
         });
-        if (res.data.success) {
+        if (res.data.success && Array.isArray(res.data.services)) {
           setServices(res.data.services);
         } else {
           setError(res.data.message);

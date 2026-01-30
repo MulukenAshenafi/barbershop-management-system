@@ -20,46 +20,51 @@ logger = logging.getLogger(__name__)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def booking_payment(request):
-    """Initialize Chapa payment for booking."""
+    """Initialize Chapa payment for booking. Idempotency-Key header prevents double-charging."""
+    idempotency_key = request.headers.get('Idempotency-Key', '').strip() or request.data.get('idempotencyKey', '')
     total_amount = request.data.get('totalAmount')
     booking_id = request.data.get('bookingId')
-    
+
     if not total_amount or not booking_id:
         return Response({
             'success': False,
             'message': 'TotalAmount and BookingId are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    if idempotency_key:
+        existing = Payment.objects.filter(idempotency_key=idempotency_key).first()
+        if existing:
+            checkout_url = (existing.metadata or {}).get('checkout_url', '')
+            return Response({
+                'success': True,
+                'checkout_url': checkout_url,
+                'tx_ref': existing.chapa_transaction_id or '',
+                'message': 'Existing transaction returned (idempotent).'
+            })
+
     try:
         booking = get_object_or_404(Booking, pk=booking_id)
-        
+
         if booking.payment_status == 'Online Paid':
             return Response({
                 'success': False,
                 'message': 'Duplicate payment detected: this booking has already been paid'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         amount = float(total_amount)
-        
+
         if amount < 0.50:
             return Response({
                 'success': False,
                 'message': 'Amount must be at least 0.50 ETB'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Initialize Chapa client
+
         chapa = ChapaClient()
-        
-        # Generate unique transaction reference
         tx_ref = chapa.generate_tx_ref(prefix='BOOKING')
-        
-        # Get webhook URL from settings or construct it
         webhook_url = getattr(settings, 'CHAPA_WEBHOOK_URL', '')
         if not webhook_url:
-            # Construct webhook URL from request
             webhook_url = f"{request.scheme}://{request.get_host()}/api/payments/webhook/chapa"
-        
-        # Initialize Chapa transaction
+
         chapa_response = chapa.initialize_transaction(
             amount=amount,
             currency='ETB',
@@ -76,14 +81,14 @@ def booking_payment(request):
                 'payment_type': 'booking'
             }
         )
-        
+
         if chapa_response.get('status') != 'success':
             return Response({
                 'success': False,
                 'message': chapa_response.get('message', 'Failed to initialize payment')
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create payment record
+
+        checkout_url = chapa_response.get('data', {}).get('checkout_url', '')
         payment = Payment.objects.create(
             user=request.user,
             payment_type='booking',
@@ -92,29 +97,27 @@ def booking_payment(request):
             currency='ETB',
             payment_method='chapa',
             status='pending',
+            idempotency_key=idempotency_key or None,
             chapa_transaction_id=tx_ref,
             chapa_reference=chapa_response.get('data', {}).get('reference', ''),
             metadata={
                 'booking_id': str(booking.id),
-                'chapa_response': chapa_response
+                'chapa_response': chapa_response,
+                'checkout_url': checkout_url,
             }
         )
-        
-        # Update booking with transaction reference (status will be updated via webhook)
+
         booking.payment_intent_id = tx_ref
         booking.payment_status = 'Online Pending'
         booking.save()
-        
-        # Return checkout URL for frontend redirect
-        checkout_url = chapa_response.get('data', {}).get('checkout_url', '')
-        
+
         return Response({
             'success': True,
             'checkout_url': checkout_url,
             'tx_ref': tx_ref,
             'message': 'Payment initialized successfully. Redirect to checkout_url to complete payment.'
         })
-        
+
     except Exception as e:
         logger.error(f"Chapa payment initialization error: {str(e)}", exc_info=True)
         return Response({
@@ -127,42 +130,47 @@ def booking_payment(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def order_payment(request):
-    """Initialize Chapa payment for order."""
+    """Initialize Chapa payment for order. Idempotency-Key header prevents double-charging."""
+    idempotency_key = request.headers.get('Idempotency-Key', '').strip() or request.data.get('idempotencyKey', '')
     total_amount = request.data.get('totalAmount')
     order_id = request.data.get('orderId')
-    
+
     if not total_amount:
         return Response({
             'success': False,
             'message': 'TotalAmount is required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    if idempotency_key:
+        existing = Payment.objects.filter(idempotency_key=idempotency_key).first()
+        if existing:
+            checkout_url = (existing.metadata or {}).get('checkout_url', '')
+            return Response({
+                'success': True,
+                'checkout_url': checkout_url,
+                'tx_ref': existing.chapa_transaction_id or '',
+                'message': 'Existing transaction returned (idempotent).'
+            })
+
     try:
         amount = float(total_amount)
-        
+
         if amount < 0.50:
             return Response({
                 'success': False,
                 'message': 'Amount must be at least 0.50 ETB'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get order if provided
+
         order = None
         if order_id:
             order = get_object_or_404(Order, pk=order_id, user=request.user)
-        
-        # Initialize Chapa client
+
         chapa = ChapaClient()
-        
-        # Generate unique transaction reference
         tx_ref = chapa.generate_tx_ref(prefix='ORDER')
-        
-        # Get webhook URL
         webhook_url = getattr(settings, 'CHAPA_WEBHOOK_URL', '')
         if not webhook_url:
             webhook_url = f"{request.scheme}://{request.get_host()}/api/payments/webhook/chapa"
-        
-        # Initialize Chapa transaction
+
         chapa_response = chapa.initialize_transaction(
             amount=amount,
             currency='ETB',
@@ -179,15 +187,15 @@ def order_payment(request):
                 'payment_type': 'order'
             }
         )
-        
+
         if chapa_response.get('status') != 'success':
             return Response({
                 'success': False,
                 'message': chapa_response.get('message', 'Failed to initialize payment')
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create payment record
-        payment = Payment.objects.create(
+
+        checkout_url = chapa_response.get('data', {}).get('checkout_url', '')
+        Payment.objects.create(
             user=request.user,
             payment_type='order',
             order=order,
@@ -195,23 +203,23 @@ def order_payment(request):
             currency='ETB',
             payment_method='chapa',
             status='pending',
+            idempotency_key=idempotency_key or None,
             chapa_transaction_id=tx_ref,
             chapa_reference=chapa_response.get('data', {}).get('reference', ''),
             metadata={
                 'order_id': str(order.id) if order else None,
-                'chapa_response': chapa_response
+                'chapa_response': chapa_response,
+                'checkout_url': checkout_url,
             }
         )
-        
-        checkout_url = chapa_response.get('data', {}).get('checkout_url', '')
-        
+
         return Response({
             'success': True,
             'checkout_url': checkout_url,
             'tx_ref': tx_ref,
             'message': 'Payment initialized successfully. Redirect to checkout_url to complete payment.'
         })
-        
+
     except Exception as e:
         logger.error(f"Chapa order payment error: {str(e)}", exc_info=True)
         return Response({

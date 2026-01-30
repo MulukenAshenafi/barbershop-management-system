@@ -1,11 +1,13 @@
 """
 Multi-tenant middleware to handle barbershop/tenant context.
 Automatically sets tenant from header, subdomain, or user's default barbershop.
+If barbershop.subscription_status == 'suspended', returns 403 "Subscription expired".
 """
 from django.utils.deprecation import MiddlewareMixin
-from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
 from .models import Barbershop, BarbershopStaff
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,12 @@ class BarbershopContextMiddleware(MiddlewareMixin):
                 barbershop_id = int(barbershop_id)
                 barbershop = Barbershop.objects.filter(id=barbershop_id, is_active=True).first()
                 if barbershop:
+                    if barbershop.subscription_status == 'suspended':
+                        return HttpResponse(
+                            json.dumps({'detail': 'Subscription expired'}),
+                            status=403,
+                            content_type='application/json',
+                        )
                     request.barbershop = barbershop
                     request.barbershop_id = barbershop_id
                     return
@@ -47,34 +55,47 @@ class BarbershopContextMiddleware(MiddlewareMixin):
                         is_active=True
                     ).first()
                     if barbershop:
+                        if barbershop.subscription_status == 'suspended':
+                            return HttpResponse(
+                                json.dumps({'detail': 'Subscription expired'}),
+                                status=403,
+                                content_type='application/json',
+                            )
                         request.barbershop = barbershop
                         request.barbershop_id = barbershop.id
                         return
                 except Exception as e:
                     logger.warning(f"Subdomain barbershop lookup error: {str(e)}")
         
-        # Priority 3: Get from user's default barbershop (if authenticated)
+        # Priority 3: If X-Barbershop-Id missing and user is authenticated,
+        # check BarbershopStaff: if exactly 1 active affiliation, auto-set context;
+        # if multiple, leave None (force explicit selection).
         if hasattr(request, 'user') and request.user.is_authenticated:
             try:
-                # Get user's first active barbershop affiliation
-                staff_member = BarbershopStaff.objects.filter(
-                    user=request.user,
-                    is_active=True
-                ).select_related('barbershop').first()
-                
-                if staff_member and staff_member.barbershop.is_active:
-                    request.barbershop = staff_member.barbershop
-                    request.barbershop_id = staff_member.barbershop.id
-                    return
-                
-                # If user owns a barbershop
-                owned_barbershop = Barbershop.objects.filter(
-                    owner=request.user,
-                    is_active=True
-                ).first()
-                
-                if owned_barbershop:
-                    request.barbershop = owned_barbershop
-                    request.barbershop_id = owned_barbershop.id
+                staff_shop_ids = list(
+                    BarbershopStaff.objects.filter(
+                        user=request.user,
+                        is_active=True,
+                        barbershop__is_active=True,
+                    ).values_list('barbershop_id', flat=True)
+                )
+                owned_shop_ids = list(
+                    Barbershop.objects.filter(
+                        owner=request.user,
+                        is_active=True,
+                    ).values_list('id', flat=True)
+                )
+                all_shop_ids = list(dict.fromkeys(staff_shop_ids + owned_shop_ids))
+                if len(all_shop_ids) == 1:
+                    barbershop = Barbershop.objects.filter(
+                        id=all_shop_ids[0],
+                        is_active=True,
+                    ).first()
+                    if barbershop:
+                        if barbershop.subscription_status == 'suspended':
+                            pass  # leave barbershop None so view can handle
+                        else:
+                            request.barbershop = barbershop
+                            request.barbershop_id = barbershop.id
             except Exception as e:
-                logger.warning(f"User barbershop lookup error: {str(e)}")
+                logger.warning("User barbershop lookup error: %s", e)
