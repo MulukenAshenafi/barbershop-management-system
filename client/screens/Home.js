@@ -1,64 +1,105 @@
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-} from "react-native";
-import React, { useState } from "react";
-import Layout from "../components/Layout/Layout";
-import Categories from "../components/category/Categories";
-import Banner from "../components/Banner/Banner";
-import Header from "../components/Layout/Header";
-import Products from "../components/Products/Products";
-import Services from "../components/Services/Service";
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import Layout from '../components/Layout/Layout';
+import Categories from '../components/category/Categories';
+import Banner from '../components/Banner/Banner';
+import Header from '../components/Layout/Header';
+import Products from '../components/Products/Products';
+import Services from '../components/Services/Service';
+import { useTheme } from '../context/ThemeContext';
+import { fontSizes, spacing, borderRadius, typography, shadows } from '../theme';
 
 const Home = () => {
-  const [activeSection, setActiveSection] = useState("Products");
+  const { colors } = useTheme();
+  const navigation = useNavigation();
+  const [activeSection, setActiveSection] = useState('Products');
 
   return (
     <Layout>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         <Header />
-        <Categories />
-        <Banner />
-
-        <View style={styles.buttonContainer}>
+        <View style={styles.hero}>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>BarberBook</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+            Find and book barbershops near you — services, products, and appointments in one app.
+          </Text>
           <TouchableOpacity
-            style={[
-              styles.button,
-              activeSection === "Products" && styles.activeButton,
-            ]}
-            onPress={() => setActiveSection("Products")}
+            style={[styles.exploreBtn, { backgroundColor: colors.primary }]}
+            onPress={() => navigation.navigate('ExploreShops')}
+            activeOpacity={0.9}
           >
-            <Text style={styles.buttonText}>Our Products</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              activeSection === "Services" && styles.activeButton,
-            ]}
-            onPress={() => setActiveSection("Services")}
-          >
-            <Text style={styles.buttonText}>Our Services</Text>
+            <Text style={styles.exploreBtnText}>Explore Shops</Text>
           </TouchableOpacity>
         </View>
+        <Categories />
 
-        {activeSection === "Products" && (
+        <View style={styles.bannerSection}>
+          <Banner />
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Browse</Text>
+          <View style={[styles.tabs, { backgroundColor: colors.gray200 }]}>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeSection === 'Products' && [styles.tabActive, { backgroundColor: colors.card }, shadows.sm],
+              ]}
+              onPress={() => setActiveSection('Products')}
+              activeOpacity={0.9}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: colors.textSecondary },
+                  activeSection === 'Products' && { color: colors.primary },
+                ]}
+              >
+                Products
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeSection === 'Services' && [styles.tabActive, { backgroundColor: colors.card }, shadows.sm],
+              ]}
+              onPress={() => setActiveSection('Services')}
+              activeOpacity={0.9}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: colors.textSecondary },
+                  activeSection === 'Services' && { color: colors.primary },
+                ]}
+              >
+                Services
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {activeSection === 'Products' && (
           <View style={styles.section}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Products />
-            </ScrollView>
+            <Products />
           </View>
         )}
-
-        {activeSection === "Services" && (
+        {activeSection === 'Services' && (
           <View style={styles.section}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Services />
-            </ScrollView>
+            <Services />
           </View>
         )}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </Layout>
   );
@@ -69,29 +110,66 @@ export default Home;
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 60, // Adjust this if needed
+    paddingBottom: spacing.xxl,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginVertical: 10,
+  hero: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: "#ddd",
-    borderRadius: 5,
+  heroTitle: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.xs,
   },
-  activeButton: {
-    backgroundColor: "#333",
+  heroSubtitle: {
+    ...typography.bodySmall,
+    lineHeight: 20,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
+  exploreBtn: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignSelf: 'flex-start',
   },
+  exploreBtnText: {
+    ...typography.body,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  bannerSection: {
+    marginBottom: spacing.lg,
+  },
+  sectionHeader: {
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.sm,
+  },
+  tabs: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.md,
+    padding: spacing.xs,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    borderRadius: borderRadius.sm,
+  },
+  tabActive: {},
+  tabText: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+  },
+  tabTextActive: {},
   section: {
-    marginVertical: 5, // Reduced vertical margin
-    paddingHorizontal: 10, // Added horizontal padding
-    width: "100%",
+    marginTop: spacing.sm,
+    width: '100%',
+  },
+  bottomSpacer: {
+    height: spacing.xl,
   },
 });

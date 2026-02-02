@@ -7,8 +7,12 @@ export let ServicesData = [];
 // Function to fetch services from the backend
 export const fetchServicesData = async () => {
   try {
-    const response = await axios.get(`${config.apiBaseUrl}/service/get-all`); // Replace with your actual API URL
-    const services = response.data.services;
+    const response = await axios.get(`${config.apiBaseUrl}/service/get-all`);
+    const services = response.data?.services;
+    if (!Array.isArray(services)) {
+      ServicesData = [];
+      return [];
+    }
 
     // Map the services to the expected format and update ServicesData
     ServicesData = services.map((service) => ({

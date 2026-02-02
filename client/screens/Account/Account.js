@@ -1,39 +1,118 @@
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   Alert,
-} from "react-native";
-import React, { useEffect, useState } from "react";
-import Layout from "../../components/Layout/Layout";
-import AntDesign from "react-native-vector-icons/AntDesign";
-import { loadUserData, UserData as initialUserData } from "../../data/UserData";
+  ScrollView,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import Layout from '../../components/Layout/Layout';
+import Card from '../../components/common/Card';
+import { NotificationBadge } from '../../components/common/NotificationBadge';
+import { OptimizedImage } from '../../components/common/OptimizedImage';
+import { AntDesign } from '@expo/vector-icons';
+import { loadUserData, UserData } from '../../data/UserData';
+import { clearAuth, updateStoredUser } from '../../services/auth';
+import NotificationService from '../../services/notifications';
+import { useTheme } from '../../context/ThemeContext';
+import {
+  fontSizes,
+  spacing,
+  typography,
+} from '../../theme';
 
-const Account = ({ navigation }) => {
-  const [user, setUser] = useState(initialUserData); // State to hold the dynamic user data
+const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/3177/3177440.png';
 
-  // Load user data from AsyncStorage when the component mounts
+function resolveAvatarUri(profilePic) {
+  if (!profilePic) return DEFAULT_AVATAR;
+  if (typeof profilePic === 'string') return profilePic;
+  if (Array.isArray(profilePic) && profilePic.length > 0) {
+    const first = profilePic[0];
+    return typeof first === 'string' ? first : (first?.url ?? DEFAULT_AVATAR);
+  }
+  return DEFAULT_AVATAR;
+}
+
+const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' };
+
+function apiUserToDisplayUser(apiUser) {
+  if (!apiUser) return null;
+  const pic = apiUser.profilePic ?? apiUser.profile_pic;
+  const profilePicUrl =
+    (Array.isArray(pic) && pic[0]?.url) ? pic[0].url
+    : (pic && typeof pic === 'object' && pic.url) ? pic.url
+    : (typeof pic === 'string' ? pic : null) || DEFAULT_AVATAR;
+  return {
+    _id: apiUser.id ?? apiUser._id ?? '',
+    profilePic: profilePicUrl,
+    name: apiUser.name ?? 'Unknown',
+    email: apiUser.email ?? '',
+    role: apiUser.role ?? '',
+    phone: apiUser.phone ?? '',
+    location: apiUser.location ?? '',
+    preferences: apiUser.preferences ?? '',
+    specialization: apiUser.specialization ?? '',
+  };
+}
+
+const Account = ({ navigation, route }) => {
+  const { themeMode, setThemeMode, colors } = useTheme();
+  const [user, setUser] = useState(() => ({ ...UserData }));
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const handleAppearancePress = () => {
+    Alert.alert(
+      'Appearance',
+      'Choose theme',
+      [
+        { text: 'Light', onPress: () => setThemeMode('light') },
+        { text: 'Dark', onPress: () => setThemeMode('dark') },
+        { text: 'System', onPress: () => setThemeMode('system') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
   useEffect(() => {
     const fetchUserData = async () => {
-      await loadUserData(); // This will update the UserData object
-      setUser({ ...initialUserData }); // Set the updated UserData to state
+      await loadUserData();
+      setUser({ ...UserData });
     };
-
     fetchUserData();
   }, []);
 
+  // When Profile navigates back with refreshedUser, update UI immediately (params can arrive after focus)
+  useEffect(() => {
+    const refreshed = route.params?.refreshedUser;
+    if (refreshed) {
+      const displayUser = apiUserToDisplayUser(refreshed);
+      if (displayUser) {
+        setUser(displayUser);
+        updateStoredUser(refreshed);
+      }
+      navigation.setParams({ refreshedUser: undefined });
+    }
+  }, [route.params?.refreshedUser, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData().then(() => setUser({ ...UserData }));
+      NotificationService.getUnreadCount().then(setUnreadCount);
+    }, [])
+  );
+
   const handleSetPreferences = () => {
     Alert.alert(
-      "Set Preferences",
-      "You don't have preferences set. Would you like to set them now?",
+      'Set preferences',
+      'Would you like to set your preferences now?',
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Set Preferences",
+          text: 'Set preferences',
           onPress: () =>
-            navigation.navigate("SetPreferences_Specialization", { user }),
+            navigation.navigate('SetPreferences_Specialization', { user }),
         },
       ]
     );
@@ -41,99 +120,143 @@ const Account = ({ navigation }) => {
 
   const handleSetSpecialization = () => {
     Alert.alert(
-      "Set Specialization",
-      "You don't have specialization set. Would you like to set it now?",
+      'Set specialization',
+      'Would you like to set your specialization now?',
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Set Specialization",
+          text: 'Set specialization',
           onPress: () =>
-            navigation.navigate("SetPreferences_Specialization", { user }),
+            navigation.navigate('SetPreferences_Specialization', { user }),
         },
       ]
     );
   };
 
+  const menuItems = [
+    {
+      icon: 'edit',
+      label: 'Edit profile',
+      onPress: () => navigation.navigate('profile', { user }),
+    },
+    {
+      icon: 'bars',
+      label: 'My orders',
+      onPress: () => navigation.navigate('myorders', { id: user._id }),
+    },
+    {
+      icon: 'calendar',
+      label: 'My appointments',
+      onPress: () => navigation.navigate('myappointments', { id: user._id }),
+    },
+    {
+      icon: 'bell',
+      label: 'Notifications',
+      onPress: () => navigation.navigate('notifications'),
+      badge: unreadCount,
+    },
+    {
+      icon: 'setting',
+      label: 'Notification settings',
+      onPress: () => navigation.navigate('notification-preferences'),
+    },
+    {
+      icon: 'bulb',
+      label: 'Appearance',
+      onPress: handleAppearancePress,
+      rightLabel: THEME_LABELS[themeMode] || 'System',
+    },
+  ];
+
+  if (user.role === 'Admin') {
+    menuItems.push({
+      icon: 'windows',
+      label: 'Admin panel',
+      onPress: () => navigation.navigate('adminPanel', { id: user._id }),
+    });
+  }
+
   return (
     <Layout>
-      <View style={styles.container}>
-        <Image source={{ uri: user.profilePic }} style={styles.image} />
-        <View style={{ justifyContent: "center", alignItems: "center" }}>
-          <Text style={styles.name}>
-            Hi {""}
-            <Text style={{ color: "green" }}>{user.name}</Text> 👋
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.profileSection}>
+          <OptimizedImage
+            key={resolveAvatarUri(user.profilePic)}
+            source={{ uri: resolveAvatarUri(user.profilePic) }}
+            style={[styles.avatar, { backgroundColor: colors.gray200 }]}
+            resizeMode="cover"
+          />
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            Hi <Text style={[styles.nameHighlight, { color: colors.success }]}>{user.name}</Text>
           </Text>
-          <Text>Email: {user.email}</Text>
-          <Text>Contact: {user.phone}</Text>
-          <Text>Location: {user.location}</Text>
-          {user.role === "Customer" &&
+          <Text style={[styles.email, { color: colors.textSecondary }]}>{user.email}</Text>
+          {user.phone ? (
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>Contact: {user.phone}</Text>
+          ) : null}
+          {user.location ? (
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>Location: {user.location}</Text>
+          ) : null}
+          {user.role === 'Customer' &&
             (user.preferences ? (
-              <Text>Preferences: {user.preferences}</Text>
+              <Text style={[styles.meta, { color: colors.textSecondary }]}>Preferences: {user.preferences}</Text>
             ) : (
-              handleSetPreferences()
+              <TouchableOpacity onPress={handleSetPreferences}>
+                <Text style={[styles.link, { color: colors.secondary }]}>Set preferences</Text>
+              </TouchableOpacity>
             ))}
-          {user.role === "Barber" &&
+          {user.role === 'Barber' &&
             (user.specialization ? (
-              <Text>Specialization: {user.specialization}</Text>
+              <Text style={[styles.meta, { color: colors.textSecondary }]}>Specialization: {user.specialization}</Text>
             ) : (
-              handleSetSpecialization()
+              <TouchableOpacity onPress={handleSetSpecialization}>
+                <Text style={[styles.link, { color: colors.secondary }]}>Set specialization</Text>
+              </TouchableOpacity>
             ))}
         </View>
-        <View style={styles.btnContainer}>
-          <Text style={styles.HeadingAccSet}>Account Setting</Text>
-          <TouchableOpacity
-            style={styles.BtnAccSetIcon}
-            onPress={() => navigation.navigate("profile", { user })}
-          >
-            <AntDesign style={styles.BtnTextAccSet} name="edit" />
-            <Text style={styles.BtnTextAccSet}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.BtnAccSetIcon}
-            onPress={() => navigation.navigate("myorders", { id: user._id })}
-          >
-            <AntDesign style={styles.BtnTextAccSet} name="bars" />
-            <Text style={styles.BtnTextAccSet}>My Orders</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.BtnAccSetIcon}
-            onPress={() =>
-              navigation.navigate("myappointments", { id: user._id })
-            }
-          >
-            <AntDesign style={styles.BtnTextAccSet} name="calendar" />
-            <Text style={styles.BtnTextAccSet}>My Appointments</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.BtnAccSetIcon}
-            onPress={() => navigation.navigate("notifications")}
-          >
-            <AntDesign style={styles.BtnTextAccSet} name="bells" />
-            <Text style={styles.BtnTextAccSet}>Notification</Text>
-          </TouchableOpacity>
-          {user.role === "Admin" && (
+
+        <Card style={styles.menuCard}>
+          <Text style={[styles.menuTitle, { color: colors.text, borderBottomColor: colors.border }]}>Account</Text>
+          {menuItems.map((item) => (
             <TouchableOpacity
-              style={styles.BtnAccSetIcon}
-              onPress={() =>
-                navigation.navigate("adminPanel", { id: user._id })
-              }
+              key={item.label}
+              style={[styles.menuRow, { borderBottomColor: colors.border }]}
+              onPress={item.onPress}
+              activeOpacity={0.8}
             >
-              <AntDesign style={styles.BtnTextAccSet} name="windows" />
-              <Text style={styles.BtnTextAccSet}>Admin Panel</Text>
+              <AntDesign
+                name={item.icon}
+                size={20}
+                color={colors.text}
+                style={styles.menuIcon}
+              />
+              <Text style={[styles.menuLabel, { color: colors.text }]}>{item.label}</Text>
+              {item.rightLabel ? (
+                <Text style={[styles.menuRightLabel, { color: colors.textSecondary }]}>{item.rightLabel}</Text>
+              ) : null}
+              {item.badge != null && item.badge > 0 ? (
+                <NotificationBadge count={item.badge} style={styles.badge} />
+              ) : null}
+              <AntDesign name="right" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
-          )}
+          ))}
           <TouchableOpacity
-            style={styles.BtnAccSetIcon}
-            onPress={() => {
-              alert("Logout Successfully");
-              navigation.navigate("login");
+            style={[styles.menuRow, styles.logoutRow]}
+            onPress={async () => {
+              await NotificationService.unregister();
+              await clearAuth();
+              navigation.reset({ index: 0, routes: [{ name: 'login' }] });
             }}
+            activeOpacity={0.8}
           >
-            <AntDesign style={styles.BtnTextAccSet} name="logout" />
-            <Text style={styles.BtnTextAccSet}>Logout</Text>
+            <AntDesign name="logout" size={20} color={colors.error} />
+            <Text style={[styles.logoutText, { color: colors.error }]}>Log out</Text>
+            <AntDesign name="right" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
-        </View>
-      </View>
+        </Card>
+      </ScrollView>
     </Layout>
   );
 };
@@ -141,48 +264,75 @@ const Account = ({ navigation }) => {
 export default Account;
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "center",
-    height: "100%",
-    padding: 20,
+  scroll: {
+    paddingBottom: spacing.xxl,
   },
-  image: {
-    height: 150,
-    width: 150,
-    borderRadius: 75,
-    resizeMode: "cover",
-    alignSelf: "center",
-    marginBottom: 20,
+  profileSection: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  name: {
-    marginTop: 10,
-    fontSize: 20,
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    marginBottom: spacing.md,
   },
-  btnContainer: {
-    padding: 10,
-    backgroundColor: "#ffffff",
-    margin: 10,
-    marginVertical: 20,
-    elevation: 5,
-    borderRadius: 10,
-    paddingBottom: 30,
+  greeting: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.xs,
   },
-  HeadingAccSet: {
-    fontSize: 20,
-    fontWeight: "bold",
-    paddingBottom: 10,
-    textAlign: "center",
+  nameHighlight: {
+    fontWeight: '600',
+  },
+  email: {
+    ...typography.bodySmall,
+    marginBottom: spacing.xs,
+  },
+  meta: {
+    ...typography.bodySmall,
+    marginTop: spacing.xs,
+  },
+  link: {
+    fontWeight: '600',
+    marginTop: spacing.sm,
+  },
+  menuCard: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  menuTitle: {
+    ...typography.body,
+    fontWeight: '600',
+    padding: spacing.md,
     borderBottomWidth: 1,
-    borderColor: "lightgray",
   },
-  BtnAccSetIcon: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 10,
-    padding: 5,
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  BtnTextAccSet: {
-    fontSize: 15,
-    marginRight: 10,
+  menuIcon: {
+    marginRight: spacing.md,
+  },
+  menuLabel: {
+    flex: 1,
+    fontSize: fontSizes.base,
+  },
+  menuRightLabel: {
+    fontSize: fontSizes.sm,
+    marginRight: spacing.sm,
+  },
+  badge: {
+    marginRight: spacing.sm,
+  },
+  logoutRow: {
+    borderBottomWidth: 0,
+  },
+  logoutText: {
+    flex: 1,
+    fontSize: fontSizes.base,
+    fontWeight: '600',
   },
 });

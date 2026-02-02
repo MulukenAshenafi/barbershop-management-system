@@ -1,51 +1,64 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
-import { CategoriesData } from "../../data/CategoriesData";
-import AntDesign from "react-native-vector-icons/AntDesign";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { CategoriesData } from '../../data/CategoriesData';
+import { colors, fontSizes, spacing, borderRadius, typography } from '../../theme';
 
-import { ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 const Categories = () => {
   const navigation = useNavigation();
+
   return (
-    <ScrollView horizontal={true} showsHorizontalScrollIndicator={false}>
-      <View style={styles.container}>
-        {CategoriesData?.map((item) => (
-          <View key={item._id}>
-            <TouchableOpacity
-              style={styles.catContainer}
-              onPress={() => navigation.navigate(item.path)}
-            >
-              {/* <AntDesign name={item.icon} style={styles.catIcon} /> */}
-              <FontAwesome name={item.icon} style={styles.catIcon} />
-              <Text style={styles.catTitle}>{item.name}</Text>
-            </TouchableOpacity>
-          </View>
+    <View style={styles.wrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.container}
+      >
+        {(CategoriesData || []).map((item) => (
+          <TouchableOpacity
+            key={item._id}
+            style={styles.chip}
+            onPress={() => navigation.navigate(item.path)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name={item.icon} size={24} color={colors.primary} style={styles.icon} />
+            <Text style={styles.label} numberOfLines={1}>{item.name}</Text>
+          </TouchableOpacity>
         ))}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 export default Categories;
 
 const styles = StyleSheet.create({
+  wrapper: {
+    marginBottom: spacing.md,
+  },
   container: {
-    backgroundColor: "#ffffff",
-    padding: 5,
-    flexDirection: "row",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  catContainer: {
-    padding: 15,
-    justifyContent: "center",
-    alignItems: "center",
+  chip: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.xs,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 72,
   },
-  catIcon: {
-    fontSize: 30,
-    verticalAlign: "top",
+  icon: {
+    marginBottom: spacing.xs,
   },
-  catTitle: {
-    fontSize: 12,
+  label: {
+    fontSize: fontSizes.xs,
+    fontWeight: '500',
+    color: colors.text,
   },
 });

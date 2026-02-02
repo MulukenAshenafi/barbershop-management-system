@@ -1,215 +1,227 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Alert,
-  Pressable,
   ScrollView,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import axios from "axios";
-import InputBox from "../../components/Form/InputBox";
-import config from "../../config";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import InputBox from '../../components/Form/InputBox';
+import Button from '../../components/common/Button';
+import Card from '../../components/common/Card';
+import { OptimizedImage } from '../../components/common/OptimizedImage';
+import { useToast } from '../../components/common/Toast';
+import { useTheme } from '../../context/ThemeContext';
+import api from '../../services/api';
+import { updateStoredUser } from '../../services/auth';
+import { getFileForFormData } from '../../utils/imageUpload';
+import { spacing, typography, borderRadius } from '../../theme';
+
+const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/3177/3177440.png';
+
+function resolveAvatarUri(profilePic) {
+  if (!profilePic) return DEFAULT_AVATAR;
+  if (typeof profilePic === 'string') return profilePic;
+  if (Array.isArray(profilePic) && profilePic.length > 0) {
+    const first = profilePic[0];
+    return typeof first === 'string' ? first : (first?.url ?? DEFAULT_AVATAR);
+  }
+  return DEFAULT_AVATAR;
+}
 
 const Profile = ({ route, navigation }) => {
+  const toast = useToast();
+  const { colors } = useTheme();
   const { user } = route.params;
 
-  const [email, setEmail] = useState(user.email);
-  const [profilePic, setProfilePic] = useState(user.profilePic);
-  const [name, setName] = useState(user.name);
-  const [location, setLocation] = useState(user.location);
-  const [contact, setContact] = useState(user.phone);
+  const [email, setEmail] = useState(user.email ?? '');
+  const [profilePic, setProfilePic] = useState(resolveAvatarUri(user.profilePic ?? ''));
+  const [name, setName] = useState(user.name ?? '');
+  const [location, setLocation] = useState(user.location ?? '');
+  const [contact, setContact] = useState(user.phone ?? '');
   const [extraField, setExtraField] = useState(
-    user.role === "Customer" ? user.preferences : user.specialization
+    user.role === 'Customer' ? (user.preferences ?? '') : (user.specialization ?? '')
   );
-  const [newImage, setNewImage] = useState(null); // State to hold the new profile image
+  const [newImage, setNewImage] = useState(null);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Function to handle image picking
   const handleImagePick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission required",
-        "We need media library permissions to select an image."
-      );
+    if (status !== 'granted') {
+      toast.show('Media library permission is needed to select a photo.', { type: 'error' });
       return;
     }
-
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 1,
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setNewImage(result.assets[0].uri); // Save the selected image URI
-    } else {
-      console.log("Image selection cancelled");
-    }
+    if (!result.canceled) setNewImage(result.assets[0].uri);
   };
 
-  // Update profile handler
   const handleUpdate = async () => {
     if (!email || !name || !location || !contact || !extraField) {
-      return Alert.alert("Validation Error", "Please provide all fields");
+      toast.show('Please provide all fields', { type: 'error' });
+      return;
     }
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("name", name);
-      formData.append("email", email);
-      formData.append("phone", contact);
-      formData.append("location", location);
-      formData.append("preferencesOrSpecialization", extraField); // Use this for the extra field
-
+      formData.append('name', name);
+      formData.append('email', email);
+      formData.append('phone', contact);
+      formData.append('location', location);
+      formData.append('preferencesOrSpecialization', extraField);
       if (newImage) {
-        const uriParts = newImage.split(".");
-        const fileType = uriParts[uriParts.length - 1];
-        formData.append("file", {
-          uri: newImage,
-          name: `profile-pic.${fileType}`,
-          type: `image/${fileType}`,
-        });
+        const file = await getFileForFormData(newImage, 'profile-pic.jpg', 'image/jpeg');
+        if (file) formData.append('file', file);
       }
-
-      const token = await AsyncStorage.getItem("token");
-
-      const res = await axios.put(
-        `${config.apiBaseUrl}/customers/update-profile`, // Update route URL
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
+      const res = await api.put('customers/update-profile', formData, {
+        headers: { 'Content-Type': false }, // Let axios set multipart/form-data with boundary for FormData
+      });
+      if (res.data?.success && res.data?.user) {
+        await updateStoredUser(res.data.user);
+      }
       setResponse(res.data);
     } catch (err) {
-      const errorMessage =
+      setError(
         err.response?.data?.message ||
-        err.message ||
-        "An unknown error occurred.";
-      setError(errorMessage);
-      console.error("Update Error:", errorMessage);
+          err.message ||
+          'An unknown error occurred.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   useEffect(() => {
-    if (response) {
-      if (response.success) {
-        Alert.alert("Success", "Profile Updated Successfully");
-        navigation.navigate("account");
-      } else {
-        Alert.alert("Update Error", response.message || "An error occurred.");
-      }
+    if (response?.success) {
+      toast.show('Profile updated', { type: 'success' });
+      navigation.navigate('account', { refreshedUser: response.user });
+    } else if (response && !response.success) {
+      toast.show(response.message || 'An error occurred.', { type: 'error' });
     }
+  }, [response, navigation, toast]);
 
-    if (error) {
-      Alert.alert("Update Error", error || "An unknown error occurred.");
-    }
-  }, [response, error]);
+  useEffect(() => {
+    if (error) toast.show(error, { type: 'error' });
+  }, [error, toast]);
 
-  // Determine the placeholder text for the extra field based on the role
-  const extraFieldPlaceholder =
-    user.role === "Customer"
-      ? "Enter your preferences"
-      : "Enter your specialization";
+  const extraPlaceholder =
+    user.role === 'Customer'
+      ? 'Preferences'
+      : 'Specialization';
 
   return (
-    <View style={styles.container}>
-      <ScrollView>
-        <View style={styles.imageContainer}>
-          <Image
-            style={styles.image}
-            source={{ uri: newImage || profilePic }}
-          />
-          <Pressable onPress={handleImagePick}>
-            <Text style={styles.updateText}>
-              {newImage ? "Change Profile Picture" : "Select Profile Picture"}
-            </Text>
-          </Pressable>
-        </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.avatarSection}>
+        <OptimizedImage
+          source={{ uri: newImage || resolveAvatarUri(profilePic) }}
+          style={styles.avatar}
+          resizeMode="cover"
+        />
+        <TouchableOpacity
+          style={[styles.avatarBtn, { backgroundColor: colors.primary }]}
+          onPress={handleImagePick}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.avatarBtnText}>
+            {newImage ? 'Change photo' : 'Add photo'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <Card style={styles.formCard}>
         <InputBox
           value={name}
           setValue={setName}
-          placeholder={"Enter your name"}
-          autoComplete={"name"}
+          placeholder="Name"
+          autoComplete="name"
         />
         <InputBox
           value={email}
           setValue={setEmail}
-          placeholder={"Enter your email"}
-          autoComplete={"email"}
+          placeholder="Email"
+          autoComplete="email"
         />
         <InputBox
           value={location}
           setValue={setLocation}
-          placeholder={"Enter your location"}
-          autoComplete={"address-line1"}
+          placeholder="Location"
+          autoComplete="address-line1"
         />
         <InputBox
           value={contact}
           setValue={setContact}
-          placeholder={"Enter your contact number"}
-          autoComplete={"tel"}
+          placeholder="Phone"
+          autoComplete="tel"
         />
         <InputBox
           value={extraField}
           setValue={setExtraField}
-          placeholder={extraFieldPlaceholder}
-          autoComplete={"off"}
+          placeholder={extraPlaceholder}
+          autoComplete="off"
         />
-        <TouchableOpacity style={styles.btnUpdate} onPress={handleUpdate}>
-          <Text style={styles.btnUpdateText}>UPDATE PROFILE</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+        <Button
+          title="Update profile"
+          onPress={handleUpdate}
+          variant="primary"
+          fullWidth
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          style={styles.updateBtn}
+        />
+      </Card>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
+export default Profile;
+
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "center",
-    height: "100%",
-    padding: 20,
+  scroll: {
+    padding: spacing.md,
+    paddingBottom: spacing.xxl,
   },
-  imageContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  image: {
-    height: 150,
-    width: 150,
-    borderRadius: 75,
-    resizeMode: "cover",
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: spacing.sm,
   },
-  updateText: {
-    color: "red",
-    marginTop: 10,
+  avatarBtn: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
   },
-  btnUpdate: {
-    backgroundColor: "#000000",
-    height: 45,
-    borderRadius: 5,
-    marginHorizontal: 30,
-    justifyContent: "center",
-    marginTop: 20,
+  avatarBtnText: {
+    color: '#fff',
+    fontWeight: '600',
   },
-  btnUpdateText: {
-    color: "#ffffff",
-    fontSize: 18,
-    textAlign: "center",
-    fontWeight: "500",
+  formCard: {
+    padding: spacing.lg,
+  },
+  updateBtn: {
+    marginTop: spacing.sm,
   },
 });
-
-export default Profile;

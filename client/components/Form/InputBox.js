@@ -1,6 +1,20 @@
-import { StyleSheet, TextInput, View } from "react-native";
-import React, { useState } from "react";
-import { Feather } from "@expo/vector-icons"; // For eye icon
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  TextInput,
+  View,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import {
+  fontSizes,
+  spacing,
+  borderRadius,
+  touchTargetMin,
+  shadows,
+} from '../../theme';
 
 const InputBox = ({
   value,
@@ -8,58 +22,84 @@ const InputBox = ({
   placeholder,
   secureTextEntry,
   inputType,
+  autoComplete,
+  ...rest
 }) => {
+  const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const isPassword = inputType === 'password' || secureTextEntry;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.wrapper,
+        {
+          borderColor: focused ? colors.primary : colors.border,
+          backgroundColor: colors.surface,
+        },
+        focused && styles.wrapperFocused,
+      ]}
+    >
       <TextInput
-        style={[styles.input, inputType === "password" && styles.passwordInput]}
+        style={[styles.input, { color: colors.text }, isPassword && styles.inputPassword]}
         placeholder={placeholder}
+        placeholderTextColor={colors.textSecondary}
         autoCorrect={false}
-        secureTextEntry={inputType === "password" && !showPassword}
+        secureTextEntry={isPassword && !showPassword}
         value={value}
         onChangeText={(text) => setValue(text)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoComplete={autoComplete}
+        {...rest}
       />
-      {inputType === "password" && (
-        <Feather
-          name={showPassword ? "eye" : "eye-off"}
-          size={20}
-          color="gray"
-          onPress={() => setShowPassword(!showPassword)}
+      {isPassword && (
+        <TouchableOpacity
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           style={styles.eyeIcon}
-        />
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Feather
+            name={showPassword ? 'eye' : 'eye-off'}
+            size={20}
+            color={colors.textSecondary}
+          />
+        </TouchableOpacity>
       )}
     </View>
   );
 };
 
-export default InputBox;
-
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: 10,
-    position: "relative",
-    width: "88%",
+  wrapper: {
+    width: '100%',
+    marginBottom: spacing.md,
+    minHeight: Math.max(touchTargetMin, 48),
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+  },
+  wrapperFocused: {
+    borderWidth: 2,
+    ...shadows.sm,
   },
   input: {
-    backgroundColor: "#ffffff",
-    height: 40,
-    paddingLeft: 10,
-    borderRadius: 10,
-    color: "#000000",
-    borderWidth: 1,
-    borderColor: "gray",
-    width: "100%", // Ensure it takes full width of the container
+    flex: 1,
+    height: Math.max(touchTargetMin, 48),
+    paddingHorizontal: spacing.md,
+    paddingVertical: Platform.OS === 'ios' ? spacing.sm : 0,
+    fontSize: fontSizes.base,
   },
-  passwordInput: {
-    paddingRight: 40, // Add space for the eye icon
+  inputPassword: {
+    paddingRight: 44,
   },
   eyeIcon: {
-    position: "absolute",
-    right: 10,
-    top: 10, // Adjust to vertically center the icon
+    position: 'absolute',
+    right: spacing.sm,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
 });
+
+export default InputBox;

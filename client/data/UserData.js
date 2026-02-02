@@ -19,12 +19,16 @@ export const loadUserData = async () => {
     const customerData = await AsyncStorage.getItem("customerData");
     if (customerData) {
       const user = JSON.parse(customerData);
-      // Update UserData with the data fetched from AsyncStorage
+      // Normalize profile pic to a string (backend may return array e.g. [{ url: "..." }])
+      let profilePic = user.customerProfilePic || "https://cdn-icons-png.flaticon.com/512/3177/3177440.png";
+      if (Array.isArray(profilePic)) {
+        profilePic = profilePic[0]?.url ?? profilePic[0] ?? "https://cdn-icons-png.flaticon.com/512/3177/3177440.png";
+      } else if (typeof profilePic !== "string") {
+        profilePic = "https://cdn-icons-png.flaticon.com/512/3177/3177440.png";
+      }
       UserData = {
         _id: user.customerId || "",
-        profilePic:
-          user.customerProfilePic ||
-          "https://cdn-icons-png.flaticon.com/512/3177/3177440.png", // Use the stored URL
+        profilePic,
 
         name: user.customerName || "Unknown",
         email: user.customerEmail || "",

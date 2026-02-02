@@ -28,11 +28,11 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            '_id', 'customerId', 'barberId', 'serviceId', 'slotId',
+            'customerId', 'barberId', 'serviceId', 'slotId',
             'bookingTime', 'paymentStatus', 'paymentIntentId',
             'bookingStatus', 'customerNotes', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['_id', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
     
     def to_representation(self, instance):
         """Convert id to _id for frontend compatibility."""
@@ -62,4 +62,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 'startTime': instance.slot.start_time.isoformat(),
                 'endTime': instance.slot.end_time.isoformat()
             }
+        if instance.barbershop_id:
+            data['barbershopId'] = instance.barbershop_id
+            data['barbershop'] = {'id': instance.barbershop_id, 'name': getattr(instance.barbershop, 'name', '')}
         return data

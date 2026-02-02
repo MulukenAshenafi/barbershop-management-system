@@ -2,8 +2,12 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import { ProductsData } from "../data/ProductsData";
 import Layout from "../components/Layout/Layout";
+import { useToast } from "../components/common/Toast";
+import { useTheme } from "../context/ThemeContext";
 
 const ProductDetails = ({ route }) => {
+  const toast = useToast();
+  const { colors } = useTheme();
   const [pDetails, setPDetails] = useState({});
   const [qty, setQty] = useState(1);
   const { params } = route;
@@ -14,7 +18,10 @@ const ProductDetails = ({ route }) => {
   }, [params?._id]);
 
   const handleAddQty = () => {
-    if (qty === 10) return alert("You can't add more than 10 quantity");
+    if (qty === 10) {
+      toast.show("You can't add more than 10 quantity", { type: "error" });
+      return;
+    }
     setQty((prev) => prev + 1);
   };
 
@@ -32,23 +39,23 @@ const ProductDetails = ({ route }) => {
           resizeMode="contain"
         />
         <View style={styles.detailsContainer}>
-          <Text style={styles.title}>{pDetails?.name}</Text>
-          <Text style={styles.price}>Price: ${pDetails?.price}</Text>
-          <Text style={styles.desc}>Description: {pDetails?.description}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{pDetails?.name}</Text>
+          <Text style={[styles.price, { color: colors.textSecondary }]}>Price: ${pDetails?.price}</Text>
+          <Text style={[styles.desc, { color: colors.text }]}>Description: {pDetails?.description}</Text>
           <View style={styles.quantityContainer}>
-            <TouchableOpacity style={styles.qtyButton} onPress={handleMinusQty}>
-              <Text style={styles.qtyButtonText}>-</Text>
+            <TouchableOpacity style={[styles.qtyButton, { backgroundColor: colors.gray200 }]} onPress={handleMinusQty}>
+              <Text style={[styles.qtyButtonText, { color: colors.text }]}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.qty}>{qty}</Text>
-            <TouchableOpacity style={styles.qtyButton} onPress={handleAddQty}>
-              <Text style={styles.qtyButtonText}>+</Text>
+            <Text style={[styles.qty, { color: colors.text }]}>{qty}</Text>
+            <TouchableOpacity style={[styles.qtyButton, { backgroundColor: colors.gray200 }]} onPress={handleAddQty}>
+              <Text style={[styles.qtyButtonText, { color: colors.text }]}>+</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={styles.cartButton}
-            onPress={() => alert(`${qty} items added to cart`)}
+            style={[styles.cartButton, { backgroundColor: colors.secondary }]}
+            onPress={() => toast.show(`${qty} items added to cart`, { type: "success" })}
           >
-            <Text style={styles.cartButtonText}>
+            <Text style={[styles.cartButtonText, { color: colors.white }]}>
               {pDetails?.quantity > 0 ? "ADD TO CART" : "OUT OF STOCK"}
             </Text>
           </TouchableOpacity>
@@ -79,7 +86,6 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 18,
-    color: "#444",
     marginBottom: 5,
   },
   desc: {
@@ -93,7 +99,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   qtyButton: {
-    backgroundColor: "lightgray",
     width: 30,
     alignItems: "center",
     justifyContent: "center",
@@ -108,14 +113,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cartButton: {
-    backgroundColor: "orange",
     borderRadius: 25,
     height: 50,
     justifyContent: "center",
     alignItems: "center",
   },
   cartButtonText: {
-    color: "#ffffff",
     fontWeight: "bold",
     fontSize: 18,
   },

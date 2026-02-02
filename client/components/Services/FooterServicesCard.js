@@ -1,44 +1,65 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
-import { useNavigation } from "@react-navigation/native";
+import React from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Alert,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import Card from '../common/Card';
+import {
+  colors,
+  fontSizes,
+  spacing,
+  borderRadius,
+  typography,
+  shadows,
+} from '../../theme';
 
 const FooterServicesCard = ({ s }) => {
   const navigation = useNavigation();
+  const id = s._id ?? s.id;
+  const name = s?.name ?? '';
+  const description = s?.description ?? '';
+  const truncated = description.length > 60 ? `${description.substring(0, 60)}…` : description;
 
-  // More details button
-  const handleMoreButton = (id) => {
-    navigation.navigate("serviceDetails", { _id: id });
-    console.log(id);
+  const handleDetails = () => {
+    navigation.navigate('serviceDetails', { _id: id, service: s });
   };
 
-  // Book now button
   const handleBookNow = () => {
-    alert("Booking feature not implemented yet");
+    Alert.alert('Book now', 'Open the service details and tap "Book now" to schedule.');
+    navigation.navigate('serviceDetails', { _id: id, service: s });
   };
 
   return (
-    <View style={styles.card}>
+    <Card style={styles.card}>
       <Image
         style={styles.cardImage}
-        resizeMode="contain"
+        resizeMode="cover"
         source={{ uri: s?.imageUrl }}
       />
-      <Text style={styles.cardTitle}>{s?.name}</Text>
-      <Text style={styles.cardDescription}>
-        {s?.description.substring(0, 30)}...more
-      </Text>
-      <View style={styles.BtnContainer}>
+      <Text style={styles.cardTitle}>{name}</Text>
+      <Text style={styles.cardDescription}>{truncated}</Text>
+      <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.btn}
-          onPress={() => handleMoreButton(s._id)}
+          style={styles.detailsBtn}
+          onPress={handleDetails}
+          activeOpacity={0.9}
         >
           <Text style={styles.btnText}>Details</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnCard} onPress={handleBookNow}>
-          <Text style={styles.btnText}>BOOK NOW</Text>
+        <TouchableOpacity
+          style={styles.bookBtn}
+          onPress={handleBookNow}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.btnText}>Book now</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Card>
   );
 };
 
@@ -46,54 +67,52 @@ export default FooterServicesCard;
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderColor: "lightgray",
-    marginVertical: 5,
-    marginHorizontal: 8,
-    width: "100%",
-    padding: 16,
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    flexDirection: "column",
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.sm,
   },
   cardImage: {
-    height: 300,
-    width: "100%",
-    marginBottom: 16,
+    height: 200,
+    width: '100%',
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.gray200,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
-    textAlign: "center",
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+    color: colors.text,
   },
   cardDescription: {
-    fontSize: 14,
-    textAlign: "left",
+    ...typography.bodySmall,
+    marginBottom: spacing.md,
   },
-  BtnContainer: {
-    marginTop: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  btn: {
-    backgroundColor: "#000000",
-    height: 35,
-    width: 100,
-    borderRadius: 20,
-    justifyContent: "center",
+  detailsBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    height: 40,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  btnCard: {
-    backgroundColor: "orange",
-    height: 35,
-    width: 100,
-    borderRadius: 20,
-    justifyContent: "center",
+  bookBtn: {
+    flex: 1,
+    backgroundColor: colors.secondary,
+    height: 40,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   btnText: {
-    color: "#ffffff",
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: "bold",
+    color: colors.white,
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
   },
 });

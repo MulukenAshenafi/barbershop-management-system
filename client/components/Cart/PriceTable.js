@@ -1,11 +1,14 @@
-import { StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { colors, fontSizes, spacing, typography } from '../../theme';
 
-const PriceTable = ({ price, title }) => {
+const PriceTable = ({ price, title, currency = 'ETB' }) => {
   return (
-    <View style={styles.container}>
+    <View style={styles.row}>
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.price}>${price.toFixed(2)}</Text>
+      <Text style={styles.price}>
+        {Number(price).toFixed(2)} {currency}
+      </Text>
     </View>
   );
 };
@@ -13,20 +16,23 @@ const PriceTable = ({ price, title }) => {
 export default PriceTable;
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
+    borderBottomColor: colors.gray200,
   },
   title: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: fontSizes.base,
+    fontWeight: '500',
+    color: colors.text,
   },
   price: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: fontSizes.base,
+    fontWeight: '600',
+    color: colors.text,
   },
 });

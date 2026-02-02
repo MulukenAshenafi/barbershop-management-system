@@ -1,56 +1,75 @@
+import React from 'react';
 import {
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   ScrollView,
-} from "react-native";
-import React, { useState } from "react";
-import { CartData } from "../data/CartData";
-import PriceTable from "../components/Cart/PriceTable";
-import Layout from "../components/Layout/Layout";
-import CartItem from "../components/Cart/CartItem";
+} from 'react-native';
+import { useCart } from '../context/CartContext';
+import PriceTable from '../components/Cart/PriceTable';
+import Layout from '../components/Layout/Layout';
+import CartItem from '../components/Cart/CartItem';
+import Button from '../components/common/Button';
+import EmptyState from '../components/common/EmptyState';
+import Card from '../components/common/Card';
+import { colors, fontSizes, spacing, typography } from '../theme';
 
 const Cart = ({ navigation }) => {
-  const [cartItems, setCartItems] = useState(CartData);
-
-  // Calculate totals
-  const subtotal = cartItems.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
-  const tax = 1.0;
-  const shipping = 1.0;
-  const grandTotal = subtotal + tax + shipping;
+  const { items, subtotal, tax, shipping, total, updateQuantity, removeItem } = useCart();
 
   return (
     <Layout>
-      <Text style={styles.heading}>
-        {cartItems.length > 0
-          ? `You have ${cartItems.length} item(s) in your cart`
-          : "Oops, your cart is empty!"}
-      </Text>
-      {cartItems.length > 0 && (
+      <View style={styles.header}>
+        <Text style={styles.heading}>
+          {items.length > 0 ? 'Your cart' : 'Cart'}
+        </Text>
+        {items.length > 0 && (
+          <Text style={styles.count}>
+            {items.length} item{items.length !== 1 ? 's' : ''}
+          </Text>
+        )}
+      </View>
+
+      {items.length === 0 ? (
+        <EmptyState
+          icon="cart-outline"
+          title="Your cart is empty"
+          message="Add products from the shop to get started."
+          actionLabel="Browse products"
+          onAction={() => navigation.navigate('home')}
+        />
+      ) : (
         <>
-          <ScrollView>
-            {cartItems.map((item) => (
-              <CartItem item={item} key={item._id} />
-            ))}
-          </ScrollView>
-          <View style={styles.summary}>
+          <View style={styles.listWrap}>
+            <ScrollView
+              contentContainerStyle={styles.scroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {items.map((item) => (
+                <CartItem
+                  key={item._id ?? item.product}
+                  item={item}
+                  onUpdateQty={(qty) => updateQuantity(item._id ?? item.product, qty)}
+                  onRemove={() => removeItem(item._id ?? item.product)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+          <Card style={styles.summaryCard}>
             <PriceTable title="Subtotal" price={subtotal} />
             <PriceTable title="Tax" price={tax} />
             <PriceTable title="Shipping" price={shipping} />
             <View style={styles.grandTotal}>
-              <PriceTable title="Grand Total" price={grandTotal} />
+              <PriceTable title="Total" price={total} />
             </View>
-            <TouchableOpacity
-              style={styles.btnCheckout}
-              onPress={() => navigation.navigate("checkout")}
-            >
-              <Text style={styles.btnCheckoutText}>CHECKOUT</Text>
-            </TouchableOpacity>
-          </View>
+            <Button
+              title="Checkout"
+              onPress={() => navigation.navigate('checkout')}
+              variant="primary"
+              fullWidth
+              style={styles.checkoutBtn}
+            />
+          </Card>
         </>
       )}
     </Layout>
@@ -60,34 +79,34 @@ const Cart = ({ navigation }) => {
 export default Cart;
 
 const styles = StyleSheet.create({
-  heading: {
-    textAlign: "center",
-    color: "#333",
-    marginVertical: 20,
-    fontSize: 18,
-    fontWeight: "bold",
+  header: {
+    marginBottom: spacing.md,
   },
-  summary: {
-    marginVertical: 20,
+  heading: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.xs,
+  },
+  count: {
+    ...typography.bodySmall,
+  },
+  listWrap: {
+    flex: 1,
+  },
+  scroll: {
+    paddingBottom: spacing.lg,
+    flexGrow: 1,
+  },
+  summaryCard: {
+    padding: spacing.md,
+    marginTop: spacing.sm,
   },
   grandTotal: {
     borderTopWidth: 1,
-    borderTopColor: "#ddd",
-    paddingVertical: 10,
+    borderTopColor: colors.gray200,
+    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
   },
-  btnCheckout: {
-    marginTop: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    height: 50,
-    width: "90%",
-    backgroundColor: "#000000",
-    marginHorizontal: "5%",
-    borderRadius: 25,
-  },
-  btnCheckoutText: {
-    color: "#ffffff",
-    fontWeight: "bold",
-    fontSize: 18,
+  checkoutBtn: {
+    marginTop: spacing.md,
   },
 });

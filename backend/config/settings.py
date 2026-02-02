@@ -163,7 +163,29 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ),
 }
+
+# CamelCase JSON (optional): pip install djangorestframework-camel-case
+try:
+    from djangorestframework_camel_case.render import CamelCaseJSONRenderer  # noqa: F401
+    from djangorestframework_camel_case.parser import CamelCaseJSONParser   # noqa: F401
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = (
+        'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
+        'rest_framework.renderers.JSONRenderer',
+    )
+    REST_FRAMEWORK['DEFAULT_PARSER_CLASSES'] = (
+        'djangorestframework_camel_case.parser.CamelCaseJSONParser',
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    )
+except ImportError:
+    pass
 
 # Add drf_spectacular if installed
 try:
@@ -192,6 +214,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:19006",  # Expo default
+    "http://localhost:8081",   # Metro web (expo start → press w)
+    "http://127.0.0.1:8081",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -308,3 +332,15 @@ LOGGING = {
 logs_dir = BASE_DIR / 'logs'
 if not logs_dir.exists():
     os.makedirs(logs_dir, exist_ok=True)
+
+# Celery (optional): pip install celery django-celery-beat redis
+# Run: celery -A config worker -l info && celery -A config beat -l info
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULE = {
+    'booking-reminders': {
+        'task': 'notifications.tasks.send_booking_reminders_task',
+        'schedule': 300.0,  # Every 5 minutes
+    },
+}

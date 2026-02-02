@@ -1,44 +1,114 @@
-import { StyleSheet, Text, View } from "react-native";
-import React from "react";
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Card from '../common/Card';
+import { colors, fontSizes, spacing, typography } from '../../theme';
+
+const formatDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
 
 const OrderItem = ({ order }) => {
+  const id = order._id ?? order.id;
+  const items = order.orderItems ?? order.order_items ?? [];
+  const total = order.totalAmount ?? order.total_amount ?? 0;
+  const status = order.orderStatus ?? order.order_status ?? 'processing';
+  const date = order.created_at ?? order.createdAt;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.orderinfo}>
-        <Text>Order ID: {order._id}</Text>
-        <Text>Date: {order.date}</Text>
+    <Card style={styles.card}>
+      <View style={styles.header}>
+        <Text style={styles.orderId}>Order #{String(id).slice(-8)}</Text>
+        <Text style={styles.date}>{formatDate(date)}</Text>
       </View>
-
-      <Text>Product name: {order.productInfo.name}</Text>
-      <Text>Price: {order.productInfo.price}$</Text>
-      <Text>Quantity: {order.productInfo.qty}</Text>
-      <Text>Total Amount: {order.totalAmount}$</Text>
-
-      <Text style={styles.status}>Order Status:{order.status}</Text>
-    </View>
+      {items.length > 0 && (
+        <View style={styles.items}>
+          {items.map((item, idx) => (
+            <Text key={idx} style={styles.itemText}>
+              {item.name} × {item.quantity} — {(item.price || 0).toFixed(2)} ETB
+            </Text>
+          ))}
+        </View>
+      )}
+      <Text style={styles.total}>Total: {Number(total).toFixed(2)} ETB</Text>
+      <View style={styles.statusRow}>
+        <Text style={styles.statusLabel}>Status</Text>
+        <View style={[styles.statusBadge, status === 'delivered' && styles.statusDelivered]}>
+          <Text style={[styles.statusText, status === 'delivered' && styles.statusDeliveredText]}>{status}</Text>
+        </View>
+      </View>
+    </Card>
   );
 };
 
 export default OrderItem;
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#ffffff",
-    margin: 10,
-    padding: 10,
-    borderRadius: 10,
+  card: {
+    marginBottom: spacing.md,
+    padding: spacing.lg,
   },
-  orderinfo: {
-    flexDirection: "row",
-    justifyContent: "center",
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderColor: "lightgray",
-    paddingBottom: 5,
+    borderBottomColor: colors.gray200,
+    marginBottom: spacing.sm,
   },
-  status: {
+  orderId: {
+    fontWeight: '600',
+    color: colors.primary,
+    fontSize: fontSizes.base,
+  },
+  date: {
+    ...typography.bodySmall,
+  },
+  items: {
+    marginBottom: spacing.sm,
+  },
+  itemText: {
+    fontSize: fontSizes.sm,
+    color: colors.text,
+    marginVertical: 2,
+  },
+  total: {
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
-    fontWeight: "bold",
-      borderColor: "lightgray",
-    padding:5,
+    borderTopColor: colors.gray200,
+  },
+  statusLabel: {
+    ...typography.bodySmall,
+    marginRight: spacing.sm,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: colors.gray200,
+  },
+  statusDelivered: {
+    backgroundColor: 'rgba(40, 167, 69, 0.15)',
+  },
+  statusText: {
+    fontSize: fontSizes.xs,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  statusDeliveredText: {
+    color: colors.success,
   },
 });

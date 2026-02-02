@@ -1,100 +1,185 @@
-# Barbershop Management System
+# BarberBook – Barbershop Management System
 
-Full-stack application for barbershop operations: service bookings, product sales, and appointments. Backend: Django REST Framework. Frontend: React Native (Expo). Serves a mobile app and supports multi-tenant barbershops.
+A full-stack barbershop booking platform: find shops, book services, buy products, and manage appointments. Branded as **BarberBook** in the client. Built for customers and shop owners with dark/light theme, Cloudinary image uploads, Chapa payments, and production-ready UX.
 
-## Stack
+---
 
-- **Backend:** Django 4.x, DRF, PostgreSQL, Redis, Gunicorn
-- **Auth:** JWT, Firebase social login
-- **Storage:** Cloudinary (media)
-- **Payments:** Chapa
-- **API docs:** OpenAPI / Swagger (drf-spectacular)
+## Value Proposition
 
-## Prerequisites
+- **Customers:** Browse shops, book services, buy products, pay via Chapa, leave reviews, and manage appointments—all in one app with dark mode and consistent toasts.
+- **Owners:** Manage barbershops, staff, services, products, bookings, and payments from an admin dashboard with clear flows and error handling.
 
-- **Docker:** Docker Desktop or Docker Engine + Docker Compose
-- **Manual:** Python 3.10+, Node 16+, PostgreSQL 12+, Redis (optional)
+---
 
-## Setup and run
+## Key Features
 
-### Docker (recommended)
+| Area | Features |
+|------|----------|
+| **Auth** | Email/password signup & login (with optional profile photo), JWT persistence, optional Firebase (Google/Apple), 401 handling with redirect to login |
+| **Booking** | Service selection, barber/slot picker, calendar, booking creation, my-appointments, cancellation |
+| **Cart & Payments** | Add services/products to cart, checkout, Chapa integration (booking & order payments), payment verification |
+| **Reviews** | Star ratings, rating breakdown, write review modal, review display on shop profile |
+| **Images** | Cloudinary uploads for profile pics, barbershop logos, services, products; consistent web/native upload and double-submit prevention |
+| **UX** | Dark/light theme (ThemeContext), app-wide toasts (ToastProvider), optimized images (Cloudinary), error boundaries, loading/skeleton states |
+| **Owner** | Dashboard, manage services/products/bookings/payments/staff, barbershop enrollment, staff invitations |
 
-1. Clone and go to project root:
-   ```bash
-   git clone <repo-url>
-   cd BSBS_UPDATED
-   ```
+---
 
-2. Add a `.env` at **project root** (same folder as `docker-compose.yml`). Copy from root `.env.example` and set at least:
-   - `SECRET_KEY`, `DEBUG`
-   - `DB_NAME`, `DB_USER`, `DB_PASSWORD` (and optionally `DB_HOST`, `DB_PORT`)
-   - `CLOUDINARY_*`, `CHAPA_*`, `FIREBASE_*` as needed.
+## Tech Stack
 
-3. Start stack:
-   ```bash
-   docker compose up --build
-   ```
+| Layer | Technologies |
+|-------|--------------|
+| **Client** | React Native (Expo SDK 54), React Navigation, Axios, AsyncStorage, Expo Notifications, react-native-maps, react-native-calendars |
+| **Backend** | Django 4.2, Django REST Framework, PostgreSQL, Redis (cache), Gunicorn |
+| **Auth** | djangorestframework-simplejwt, Firebase Admin SDK (optional social login) |
+| **Storage** | Cloudinary (media), django-cloudinary-storage |
+| **Payments** | Chapa (webhook + verify flow) |
+| **API** | drf-spectacular (OpenAPI/Swagger), djangorestframework-camel-case (camelCase JSON) |
+| **Optional** | Celery + django-celery-beat (booking reminder pushes) |
 
-4. Create an admin user (in another terminal):
-   ```bash
-   docker compose exec backend python manage.py createsuperuser
-   ```
+---
 
-5. Open:
-   - API: http://localhost:8000
-   - Admin: http://localhost:8000/admin/
-   - Swagger: http://localhost:8000/api/docs/
-
-Migrations run on backend startup. DB and Redis use the same `.env` via Compose; backend overrides `DB_HOST` and `REDIS_URL` for the Docker network.
-
-**Useful commands:**
-- Background: `docker compose up -d`
-- Logs: `docker compose logs -f backend`
-- Stop: `docker compose down`
-- Stop and remove data: `docker compose down -v`
-- Run management commands: `docker compose exec backend python manage.py <command>`
-
-### Manual (no Docker)
-
-1. **Backend:** Create and activate a venv, install deps (`pip install -r backend/requirements.txt`). Add a `.env` at **project root** (Django loads `BASE_DIR.parent / ".env"`). Create the Postgres DB, then:
-   ```bash
-   cd backend
-   python manage.py migrate
-   python manage.py createsuperuser
-   python manage.py runserver
-   ```
-
-2. **Client:** In `client/`, set the API base URL in `config.js`, then `npm install` and `npm start` (Expo).
-
-## Project layout
+## Project Structure
 
 ```
-├── backend/          # Django API (accounts, barbershops, services, bookings, payments, notifications)
-├── client/           # React Native (Expo) app
-├── docker-compose.yml
-├── .env.example      # Template for root .env
+BSBS_UPDATED/
+├── backend/           # Django API (accounts, barbershops, services, bookings, payments, notifications)
+├── client/             # Expo (React Native) app
+│   ├── assets/         # App icon, splash, favicon, banners, fallback images
+│   ├── components/
+│   ├── context/
+│   ├── data/
+│   ├── screens/
+│   ├── services/
+│   ├── theme/
+│   └── utils/          # Shared helpers (e.g. imageUpload for Cloudinary)
+├── docker-compose.yml  # PostgreSQL, Redis, Django backend
+├── .env                # Not committed; copy from .env.example
 └── README.md
 ```
 
-## Environment
+---
 
-Use a single `.env` at **project root**. Required for backend: `SECRET_KEY`, `DEBUG`, `DB_*`. Optional: `CLOUDINARY_*`, `CHAPA_*`, `FIREBASE_*`, `REDIS_URL`. See root `.env.example`. Never commit `.env` (it is in `.gitignore`).
+## How to Run Locally
 
-## API overview
+### Prerequisites
 
-- **Auth:** `POST /api/customers/signup`, `POST /api/customers/login`, `POST /api/customers/firebase-login`, `GET /api/customers/profile`
-- **Services:** `GET /api/service/get-all`, `POST /api/service/create`, `GET /api/service/<id>`
-- **Products:** `GET /api/product/get-all`, `POST /api/product/create`
-- **Bookings:** `POST /api/booking/create`, `GET /api/booking/availability`, `GET /api/booking/get-all`
-- **Orders:** `POST /api/order/create`, `GET /api/order/my-orders`
-- **Payments:** `POST /api/booking/payments`, `POST /api/order/payments`, `POST /api/payments/verify`, `POST /api/payments/webhook/chapa`
-- **Docs:** `GET /api/docs/` (Swagger), `GET /api/redoc/`, `GET /api/schema/`
+- **Docker:** Docker Desktop or Docker Engine + Docker Compose  
+- **Or manual:** Python 3.10+, Node 18+, PostgreSQL 12+, Redis (optional)
 
-Roles: Customer, Barber, Admin. Multi-tenant via `X-Barbershop-Id` (or subdomain/user default).
+### 1. Clone and enter project
 
-## Deployment
+```bash
+git clone <repo-url>
+cd BSBS_UPDATED
+```
 
-Set `DEBUG=False`, configure `ALLOWED_HOSTS` and production DB/Redis in `.env`. Use a reverse proxy (e.g. Nginx) for HTTPS and static files, or keep serving static in Django only when `DEBUG=True`. Build the mobile app with Expo/EAS.
+### 2. Environment
+
+- Copy root **`.env.example`** to **`.env`** at the **project root** (same folder as `docker-compose.yml`).
+- Set at least: `SECRET_KEY`, `DEBUG`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+- Optionally: `DB_HOST`, `DB_PORT`, `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET`, `CHAPA_*`, `FIREBASE_*`, `REDIS_URL`.
+
+### 3. Run backend with Docker (recommended)
+
+```bash
+docker compose up --build
+```
+
+In another terminal, create an admin user:
+
+```bash
+docker compose exec backend python manage.py createsuperuser
+```
+
+- **API:** http://localhost:8000  
+- **Admin:** http://localhost:8000/admin/  
+- **Swagger:** http://localhost:8000/api/docs/
+
+### 4. Run the client
+
+```bash
+cd client
+cp .env.example .env   # optional: set EXPO_PUBLIC_API_URL for device testing
+npm install
+npm start
+```
+
+Then use Expo Go (scan QR), or press **w** for web at http://localhost:8081, or `npm run android` / `npm run ios`.
+
+### Manual backend (no Docker)
+
+```bash
+cd backend
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+Client: in `client/`, set API base URL in `config.js` (or `.env` with `EXPO_PUBLIC_API_URL`), then `npm install` and `npm start`.
+
+---
+
+## Environment Variables
+
+**Root `.env` (backend / Docker):**
+
+- `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+- `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET` — for profile pics, logos, services, products
+- `CHAPA_SECRET_KEY`, `CHAPA_PUBLIC_KEY`, `CHAPA_WEBHOOK_SECRET`
+- `FIREBASE_*` (if using Firebase auth)
+- `REDIS_URL` (optional)
+
+**Client (optional `.env`):**
+
+- `EXPO_PUBLIC_API_URL` — API base URL (no trailing slash); use LAN IP when testing on a physical device.
+- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` — for Google sign-in.
+- `EXPO_PUBLIC_FORCE_WELCOME` — set to `true` to always show welcome screen (e.g. for demos).
+
+**Never commit real secrets.** `.env` is in `.gitignore`.
+
+---
+
+## Screens & Flows
+
+**Customer:** Welcome → Login/Register → Home → Explore shops / Services / Products → Book service (slot selection) → Cart → Checkout → Payments (Chapa) → Confirmation; Account (profile, my appointments, my orders, notifications); Shop public profile & reviews.
+
+**Owner / Admin:** Dashboard → Manage Services, Products, Bookings, Payments, Barbers; Staff enrollment (invite, join barbershop); barbershop registration and preferences.
+
+---
+
+## Preparing for Git Push
+
+Before pushing to a remote repository:
+
+1. **Do not commit secrets.** Ensure `.env` is listed in `.gitignore` (it is by default). Never commit API keys, `SECRET_KEY`, or database passwords.
+2. **Use `.env.example` as a template.** Commit `.env.example` with placeholder values; teammates copy it to `.env` and fill in real values locally.
+3. **Check ignored paths.** The repo ignores `node_modules/`, `venv/`, `__pycache__/`, `.expo/`, `web-build/`, and other build/cache artifacts.
+4. **Optional: pre-push checks.** Run tests or lint if you have them (e.g. `cd backend && python manage.py check`, `cd client && npm run lint` if configured).
+
+Example first push:
+
+```bash
+git add .
+git status   # confirm no .env or sensitive files
+git commit -m "Initial commit: BarberBook full-stack app"
+git remote add origin <your-remote-url>
+git push -u origin main
+```
+
+---
+
+## Production Notes
+
+- **Error handling:** API client centralizes error messages; ErrorBoundary and toasts for user feedback.
+- **Theming:** ThemeContext (light/dark); StatusBar and navigation follow theme.
+- **Images:** Cloudinary for uploads; shared `getFileForFormData` in `client/utils/imageUpload.js` for web/native consistency; submit buttons use loading/disabled to prevent double uploads.
+- **API:** OpenAPI at `/api/docs/`, camelCase responses, CORS configured; Chapa webhook and verify for payments.
+- **Deploy:** Set `DEBUG=False`, configure `ALLOWED_HOSTS` and production DB/Redis; build mobile with Expo EAS or `expo build`.
+
+---
 
 ## License
 

@@ -1,7 +1,7 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL + PostGIS (for geo-search / barbershops near me)
   db:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.3-alpine
     container_name: bsbs_db
     environment:
       POSTGRES_DB: ${DB_NAME:-barbershop_db}

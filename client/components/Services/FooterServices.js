@@ -1,35 +1,51 @@
-import { ScrollView, StyleSheet, View } from "react-native";
-import React from "react";
-import FooterServicesCard from "./FooterServicesCard";
-import { ServicesData } from "../../data/ServicesData";
-import Layout from "../Layout/Layout";
+import React from 'react';
+import { ScrollView, StyleSheet, View, Text } from 'react-native';
+import FooterServicesCard from './FooterServicesCard';
+import { ServicesData } from '../../data/ServicesData';
+import Layout from '../Layout/Layout';
+import EmptyState from '../common/EmptyState';
+import { colors, spacing, typography } from '../../theme';
 
-const Services = () => {
+const FooterServices = () => {
+  const services = Array.isArray(ServicesData) ? ServicesData : [];
+
   return (
     <Layout>
       <View style={styles.container}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {ServicesData.map((s) => (
-            <FooterServicesCard key={s._id} s={s} />
-          ))}
-        </ScrollView>
+        <Text style={styles.title}>Services</Text>
+        {services.length === 0 ? (
+          <EmptyState
+            icon="scissors-cutting"
+            title="No services yet"
+            message="Check back later for our offerings."
+          />
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            showsVerticalScrollIndicator={false}
+          >
+            {services.map((s) => (
+              <FooterServicesCard key={s._id ?? s.id} s={s} />
+            ))}
+          </ScrollView>
+        )}
       </View>
     </Layout>
   );
 };
 
+export default FooterServices;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5", // Light gray background
-    padding: 10,
+    paddingVertical: spacing.md,
   },
-  scrollContainer: {
-    alignItems: "center", // Center items vertically within the scroll view
+  title: {
+    ...typography.sectionTitle,
+    marginBottom: spacing.md,
+  },
+  scroll: {
+    paddingBottom: spacing.xxl,
   },
 });
-
-export default Services;

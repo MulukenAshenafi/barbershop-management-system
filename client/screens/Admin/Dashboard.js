@@ -1,8 +1,10 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React from "react";
 import Layout from "../../components/Layout/Layout";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
+import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { shadows } from "../../theme";
+import BarbershopSelector from "../../components/barbershop/BarbershopSelector";
 
 const Dashboard = () => {
   const navigation = useNavigation();
@@ -10,6 +12,9 @@ const Dashboard = () => {
   return (
     <Layout>
       <View style={styles.main}>
+        <View style={styles.selectorRow}>
+          <BarbershopSelector />
+        </View>
         <Text style={styles.heading}>Dashboard</Text>
         <View style={styles.btnContainer}>
           <TouchableOpacity
@@ -21,9 +26,16 @@ const Dashboard = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.btn}
-            onPress={() => navigation.navigate("ManageBarbers")} // Adjust the name to match your route
+            onPress={() => navigation.navigate("ManageStaff")}
           >
             <FontAwesome style={styles.icon} name="users" />
+            <Text style={styles.btnText}>Manage Staff</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => navigation.navigate("ManageBarbers")}
+          >
+            <FontAwesome style={styles.icon} name="user-plus" />
             <Text style={styles.btnText}>Manage Barbers</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -65,6 +77,10 @@ const styles = StyleSheet.create({
     backgroundColor: "lightgray",
     height: "96%",
   },
+  selectorRow: {
+    margin: 10,
+    marginBottom: 0,
+  },
   heading: {
     backgroundColor: "#000000",
     color: "#ffffff",
@@ -84,8 +100,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     padding: 20,
     borderRadius: 10,
-    elevation: 10,
     marginBottom: 20,
+    ...shadows.md,
   },
   icon: {
     fontSize: 25,

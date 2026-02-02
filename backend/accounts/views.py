@@ -13,6 +13,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+try:
+    import cloudinary
+    import cloudinary.uploader
+    HAS_CLOUDINARY = True
+except ImportError:
+    HAS_CLOUDINARY = False
+
 User = get_user_model()
 
 
@@ -21,10 +28,17 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_permissions(self):
+        if self.action in ('signup', 'login'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         """Filter queryset based on user role."""
         user = self.request.user
+        if not user.is_authenticated:
+            return User.objects.none()
         if user.role == 'Admin':
             return User.objects.all()
         elif user.role == 'Customer':
@@ -34,30 +48,64 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def signup(self, request):
-        """Customer registration endpoint."""
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save(role='Customer')
-            token = RefreshToken.for_user(user)
-            
+        """Customer registration endpoint. Accepts JSON or multipart/form-data."""
+        # Normalize input: multipart sends all values as strings; only pass expected fields
+        data = {}
+        for key in ('name', 'email', 'password', 'phone', 'location'):
+            val = request.data.get(key)
+            if val is not None:
+                data[key] = val if isinstance(val, str) else str(val)
+        serializer = UserRegistrationSerializer(data=data)
+        if not serializer.is_valid():
+            errors = serializer.errors
+            first_msg = 'Validation failed'
+            for _k, v in errors.items():
+                if isinstance(v, list) and v:
+                    first_msg = str(v[0])
+                    break
+                if isinstance(v, str):
+                    first_msg = v
+                    break
             return Response({
-                'success': True,
-                'message': 'Customer registered successfully.',
-                'user': {
-                    'id': str(user.id),
-                    'name': user.name,
-                    'email': user.email,
-                    'role': user.role,
-                    'profilePic': user.profile_pic,
-                },
-                'token': str(token.access_token),
-            }, status=status.HTTP_201_CREATED)
-        
+                'success': False,
+                'message': first_msg,
+                'errors': errors,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.save(role='Customer')
+        # Optional profile image upload (only if Cloudinary is fully configured)
+        if HAS_CLOUDINARY and request.FILES.get('file'):
+            from django.conf import settings
+            cloud_cfg = getattr(settings, 'CLOUDINARY_STORAGE', {}) or {}
+            api_key = (cloud_cfg.get('API_KEY') or '').strip()
+            api_secret = (cloud_cfg.get('API_SECRET') or '').strip()
+            cloud_name = (cloud_cfg.get('CLOUD_NAME') or '').strip()
+            if api_key and api_secret and cloud_name:
+                try:
+                    cloudinary.config(cloud_name=cloud_name, api_key=api_key, api_secret=api_secret)
+                    upload_result = cloudinary.uploader.upload(
+                        request.FILES['file'],
+                        folder='accounts/profiles',
+                    )
+                    user.profile_pic_url = upload_result.get('secure_url')
+                    user.profile_pic_public_id = upload_result.get('public_id')
+                    user.save(update_fields=['profile_pic_url', 'profile_pic_public_id'])
+                except Exception as e:
+                    logger.warning('Profile image upload failed: %s', e)
+            else:
+                logger.warning('Cloudinary not configured: missing API_KEY, API_SECRET, or CLOUD_NAME (check .env)')
+        token = RefreshToken.for_user(user)
         return Response({
-            'success': False,
-            'message': 'Registration failed.',
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'success': True,
+            'message': 'Customer registered successfully.',
+            'user': {
+                'id': str(user.id),
+                'name': user.name,
+                'email': user.email,
+                'role': user.role,
+                'profilePic': user.profile_pic,
+            },
+            'token': str(token.access_token),
+        }, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
@@ -113,21 +161,57 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated])
     def update_profile(self, request):
-        """Update user profile."""
-        serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            user = serializer.save()
+        """Update user profile. Accepts JSON or multipart/form-data (optional file)."""
+        # Normalize input: multipart sends all values as strings
+        data = {}
+        for key in ('name', 'email', 'phone', 'location', 'preferencesOrSpecialization'):
+            val = request.data.get(key)
+            if val is not None:
+                data[key] = val if isinstance(val, str) else str(val)
+        serializer = UserUpdateSerializer(request.user, data=data, partial=True)
+        if not serializer.is_valid():
+            errors = serializer.errors
+            first_msg = errors.get('__all__', ['Update failed.'])[0] if isinstance(errors.get('__all__'), list) else 'Update failed.'
+            for _k, v in errors.items():
+                if isinstance(v, list) and v and _k != '__all__':
+                    first_msg = str(v[0])
+                    break
+                if isinstance(v, str) and _k != '__all__':
+                    first_msg = v
+                    break
             return Response({
-                'success': True,
-                'message': 'Profile updated successfully.',
-                'user': UserSerializer(user).data
-            }, status=status.HTTP_200_OK)
-        
+                'success': False,
+                'message': first_msg,
+                'errors': errors,
+            }, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.save()
+        # Optional profile image upload (same as signup)
+        if HAS_CLOUDINARY and request.FILES.get('file'):
+            from django.conf import settings as django_settings
+            cloud_cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {}) or {}
+            api_key = (cloud_cfg.get('API_KEY') or '').strip()
+            api_secret = (cloud_cfg.get('API_SECRET') or '').strip()
+            cloud_name = (cloud_cfg.get('CLOUD_NAME') or '').strip()
+            if api_key and api_secret and cloud_name:
+                try:
+                    cloudinary.config(cloud_name=cloud_name, api_key=api_key, api_secret=api_secret)
+                    upload_result = cloudinary.uploader.upload(
+                        request.FILES['file'],
+                        folder='accounts/profiles',
+                    )
+                    user.profile_pic_url = upload_result.get('secure_url')
+                    user.profile_pic_public_id = upload_result.get('public_id')
+                    user.save(update_fields=['profile_pic_url', 'profile_pic_public_id'])
+                    user.refresh_from_db()
+                except Exception as e:
+                    logger.warning('Profile image upload failed: %s', e)
+            else:
+                logger.warning('Cloudinary not configured: missing API_KEY, API_SECRET, or CLOUD_NAME (check .env)')
         return Response({
-            'success': False,
-            'message': 'Update failed.',
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'success': True,
+            'message': 'Profile updated successfully.',
+            'user': UserSerializer(user).data,
+        }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def set_preferences(self, request):

@@ -31,10 +31,11 @@ db.sqlite3-journal
 /media
 /staticfiles
 
-# Environment variables
+# Environment variables (do not commit secrets)
 .env
 .env.local
 .env.*.local
+client/.env
 
 # Node.js / React Native
 node_modules/

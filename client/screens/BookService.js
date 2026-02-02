@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,228 +6,232 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
-} from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import { Calendar } from "react-native-calendars";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import config from "../config";
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import { Calendar } from 'react-native-calendars';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import api from '../services/api';
+import { getStoredCustomer } from '../services/auth';
+import Button from '../components/common/Button';
+import Card from '../components/common/Card';
+import { useToast } from '../components/common/Toast';
+import { useTheme } from '../context/ThemeContext';
+import { fontSizes, spacing, borderRadius, typography, colors as themeColors } from '../theme';
 
 const BookService = ({ route, navigation }) => {
-  const { serviceId, serviceName, servicePrice, serviceImage } = route.params;
+  const toast = useToast();
+  const { colors } = useTheme();
+  const params = route.params ?? {};
+  const { serviceId, serviceName, servicePrice, serviceImage } = params;
   const [barbers, setBarbers] = useState([]);
-  const [selectedBarber, setSelectedBarber] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedBarber, setSelectedBarber] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
-  const [customer, setCustomer] = useState({ _id: "", name: "" });
+  const [customer, setCustomer] = useState({ customerId: '', name: '' });
   const [markedDates, setMarkedDates] = useState({});
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [loadingBarbers, setLoadingBarbers] = useState(true);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   useEffect(() => {
-    const fetchCustomer = async () => {
-      try {
-        const customerData = await AsyncStorage.getItem("customerData");
-        if (customerData) {
-          setCustomer(JSON.parse(customerData));
-        }
-      } catch (error) {
-        console.error("Error fetching customer data:", error);
-      }
+    const load = async () => {
+      const c = await getStoredCustomer();
+      if (c) setCustomer({ customerId: c.customerId, name: c.customerName });
     };
-    fetchCustomer();
+    load();
   }, []);
 
   useEffect(() => {
     const fetchBarbers = async () => {
+      setLoadingBarbers(true);
       try {
-        const token = await AsyncStorage.getItem("token");
-        const response = await axios.get(
-          `${config.apiBaseUrl}/barbers/get-all`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setBarbers(response.data.barbers);
+        const response = await api.get('barbers/get-all');
+        setBarbers(response.data.barbers || []);
       } catch (error) {
-        console.error("Error fetching barbers:", error);
-        Alert.alert("Error", "Unable to fetch barbers. Please try again.");
+        toast.show('Unable to fetch barbers. Please try again.', { type: 'error' });
+      } finally {
+        setLoadingBarbers(false);
       }
     };
     fetchBarbers();
   }, []);
 
   useEffect(() => {
+    if (!selectedBarber || !selectedDate) {
+      setAvailableSlots([]);
+      return;
+    }
     const fetchAvailability = async () => {
-      if (selectedBarber && selectedDate) {
-        try {
-          const token = await AsyncStorage.getItem("token");
-          const response = await axios.get(
-            `${config.apiBaseUrl}/booking/availability`,
-            {
-              params: {
-                barberId: selectedBarber,
-                date: selectedDate,
-              },
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          setAvailableSlots(response.data.availableSlots || []);
-
-          const marked = {};
-          if (response.data.availableSlots.length === 0) {
-            marked[selectedDate] = { selected: true, selectedColor: "red" };
-          } else {
-            marked[selectedDate] = { selected: true, selectedColor: "green" };
-          }
-          setMarkedDates(marked);
-        } catch (error) {
-          console.error("Error fetching availability:", error);
-          Alert.alert(
-            "Error",
-            "Unable to check availability. Please try again."
-          );
-        }
+      setLoadingSlots(true);
+      try {
+        const response = await api.get('booking/availability', {
+          params: { barberId: selectedBarber, date: selectedDate },
+        });
+        const slots = response.data.availableSlots || [];
+        setAvailableSlots(slots);
+        const marked = {};
+        marked[selectedDate] = {
+          selected: true,
+          selectedColor: slots.length === 0 ? colors.secondary : colors.success,
+        };
+        setMarkedDates(marked);
+      } catch (error) {
+        toast.show('Unable to check availability. Please try again.', { type: 'error' });
+      } finally {
+        setLoadingSlots(false);
       }
     };
     fetchAvailability();
   }, [selectedBarber, selectedDate]);
 
-  const handleTimePick = (event, selectedDate) => {
+  const handleTimePick = (event, date) => {
     setShowTimePicker(false);
-    if (event.type === "set" && selectedDate) {
-      setSelectedTime(selectedDate);
-    }
+    if (event.type === 'set' && date) setSelectedTime(date);
   };
 
   const handleBooking = async (paymentMethod) => {
     if (!selectedTime) {
-      Alert.alert("Error", "Please select a time slot.");
+      toast.show('Please select a time slot.', { type: 'error' });
       return;
     }
-
+    if (!customer.customerId) {
+      toast.show('Please log in again.', { type: 'error' });
+      return;
+    }
+    const paymentStatus =
+      paymentMethod === 'cash' ? 'Pending to be paid on cash' : 'Online Pending';
     try {
-      const customerData = await AsyncStorage.getItem("customerData");
-      const customer = customerData ? JSON.parse(customerData) : {};
-
-      if (!customer.customerId) {
-        Alert.alert("Error", "Customer not found. Please log in again.");
-        return;
-      }
-
-      // Determine payment status based on the payment method
-      const paymentStatus =
-        paymentMethod === "cash" ? "Pending to be paid on cash" : "Online Pending";
-
-      const bookingData = {
+      const response = await api.post('booking/create', {
         serviceId,
         barberId: selectedBarber,
         customerId: customer.customerId,
         bookingTime: selectedTime.toISOString(),
-        customerNotes: "", // Add customer notes if needed
-        paymentStatus, // Set payment status based on payment method
-      };
-
-      const token = await AsyncStorage.getItem("token");
-      const response = await axios.post(
-        `${config.apiBaseUrl}/booking/create`,
-        bookingData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      // Get the bookingId from the response
-      const bookingId = response.data.booking._id;
-
-      // Find the selected barber's name
+        customerNotes: '',
+        paymentStatus,
+      });
+      const createdBooking = response.data.booking;
+      const bookingId = createdBooking._id ?? createdBooking.id;
       const selectedBarberName =
-        barbers.find((barber) => barber._id === selectedBarber)?.name ||
-        "Unknown Barber";
-
-      const navigationData = {
-        customerName: customer.name,
+        barbers.find((b) => String(b._id) === String(selectedBarber))?.name || 'Barber';
+      const navData = {
+        customerName: customer.customerName ?? customer.name,
         barberName: selectedBarberName,
-        bookingData: response.data.booking,
+        bookingData: createdBooking,
         serviceName,
         totalAmount: servicePrice,
-        bookingId, // Pass bookingId here
+        bookingId,
       };
-
-      if (paymentMethod === "cash") {
-        Alert.alert("Success", "Booking created successfully");
-        navigation.navigate("Confirmation", {
-          ...navigationData,
-          paymentStatus: "Pending to be paid on cash",
+      if (paymentMethod === 'cash') {
+        toast.show('Booking created successfully', { type: 'success' });
+        navigation.navigate('Confirmation', {
+          ...navData,
+          paymentStatus: 'Pending to be paid on cash',
         });
-      } else if (paymentMethod === "online") {
-        navigation.navigate("payment", {
-          ...navigationData,
-          paymentStatus: "Online Paid",
+      } else {
+        navigation.navigate('payment', {
+          ...navData,
+          paymentStatus: 'Online Pending',
         });
       }
     } catch (error) {
-      console.error("Error creating booking:", error);
-      Alert.alert("Error", "Unable to create booking. Please try again.");
+      const status = error.response?.status;
+      const msg =
+        status === 409
+          ? 'This slot was just booked. Please choose another time.'
+          : error.response?.data?.error ??
+            error.response?.data?.details ??
+            'Unable to create booking.';
+      toast.show(msg, { type: 'error' });
     }
   };
 
+  if (!serviceId || !serviceName) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.serviceName, { color: colors.text }]}>Please select a service first.</Text>
+        <Button title="Go back" onPress={() => navigation.goBack()} variant="primary" fullWidth style={{ marginTop: 16 }} />
+      </View>
+    );
+  }
 
   const confirmPaymentMethod = () => {
-    Alert.alert(
-      "Choose Payment Option",
-      "Please select a payment method:",
-      [
-        {
-          text: "Cash on Person",
-          onPress: () => handleBooking("cash"),
-        },
-        {
-          text: "Online Payment",
-          onPress: () => handleBooking("online"),
-        },
-      ],
-      { cancelable: true }
-    );
+    Alert.alert('Choose Payment', 'Select how you want to pay:', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Cash', onPress: () => handleBooking('cash') },
+      { text: 'Online', onPress: () => handleBooking('online') },
+    ], { cancelable: true });
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.header}>Book Your Service</Text>
-      <Picker
-        selectedValue={selectedBarber}
-        onValueChange={(itemValue) => setSelectedBarber(itemValue)}
-        style={styles.picker}
-      >
-        <Picker.Item label="Select Barber" value="" />
-        {barbers.map((barber) => (
-          <Picker.Item
-            key={barber._id}
-            label={barber.name}
-            value={barber._id}
-          />
-        ))}
-      </Picker>
-      <Calendar
-        onDayPress={(day) => {
-          setSelectedDate(day.dateString);
-          setAvailableSlots([]);
-          setSelectedTime(null);
-        }}
-        markedDates={markedDates}
-        theme={{
-          selectedDayBackgroundColor: "#5cb85c",
-          todayTextColor: "#007bff",
-        }}
-      />
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.pageTitle}>Book your service</Text>
+      <Text style={styles.serviceName}>{serviceName}</Text>
+
+      <Card style={styles.card}>
+        <Text style={styles.stepLabel}>1. Choose barber</Text>
+        {loadingBarbers ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading barbers…</Text>
+          </View>
+        ) : (
+          <Picker
+            selectedValue={selectedBarber}
+            onValueChange={(v) => setSelectedBarber(v)}
+            style={styles.picker}
+            prompt="Select barber"
+          >
+            <Picker.Item label="Select barber" value="" />
+            {(barbers || []).map((barber) => (
+              <Picker.Item
+                key={barber._id ?? barber.id}
+                label={barber.name || 'Barber'}
+                value={String(barber._id ?? barber.id)}
+              />
+            ))}
+          </Picker>
+        )}
+      </Card>
+
+      <Card style={styles.card}>
+        <Text style={styles.stepLabel}>2. Pick a date</Text>
+        <Calendar
+          onDayPress={(day) => {
+            setSelectedDate(day.dateString);
+            setAvailableSlots([]);
+            setSelectedTime(null);
+          }}
+          markedDates={markedDates}
+          theme={{
+            selectedDayBackgroundColor: colors.success,
+            selectedDayTextColor: colors.white,
+            todayTextColor: colors.primary,
+            arrowColor: colors.primary,
+          }}
+        />
+      </Card>
+
       {selectedDate && (
-        <View style={styles.timePickerContainer}>
+        <Card style={styles.card}>
+          <Text style={styles.stepLabel}>3. Pick a time</Text>
           <TouchableOpacity
             onPress={() => setShowTimePicker(true)}
-            style={styles.timePickerButton}
+            style={styles.timeBtn}
+            activeOpacity={0.9}
           >
-            <Text style={styles.buttonText}>Pick a Time</Text>
+            <Text style={styles.timeBtnText}>
+              {selectedTime
+                ? selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'Select time'}
+            </Text>
           </TouchableOpacity>
           {showTimePicker && (
             <DateTimePicker
@@ -235,26 +239,25 @@ const BookService = ({ route, navigation }) => {
               value={selectedTime || new Date()}
               display="spinner"
               onChange={handleTimePick}
-              is24Hour={true}
+              is24Hour
             />
           )}
-          {selectedTime && (
-            <Text style={styles.selectedTime}>
-              Selected Time:{" "}
-              {selectedTime.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
+          {loadingSlots && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading slots…</Text>
+            </View>
           )}
-        </View>
+        </Card>
       )}
-      <TouchableOpacity
+
+      <Button
+        title="Confirm booking"
         onPress={confirmPaymentMethod}
-        style={styles.confirmButton}
-      >
-        <Text style={styles.buttonText}>Confirm Booking</Text>
-      </TouchableOpacity>
+        variant="primary"
+        fullWidth
+        style={styles.confirmBtn}
+      />
     </ScrollView>
   );
 };
@@ -262,45 +265,56 @@ const BookService = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: themeColors.background,
   },
-  header: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 16,
-    color: "#333",
+  content: {
+    padding: spacing.md,
+    paddingBottom: spacing.xxl,
+  },
+  pageTitle: {
+    ...typography.subtitle,
+    marginBottom: spacing.xs,
+  },
+  serviceName: {
+    ...typography.bodySmall,
+    marginBottom: spacing.lg,
+  },
+  card: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+  },
+  stepLabel: {
+    ...typography.bodySmall,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
   },
   picker: {
-    height: 50,
-    width: "100%",
-    marginBottom: 20,
-    backgroundColor: "#fff",
-    borderRadius: 5,
+    height: 48,
+    width: '100%',
   },
-  timePickerContainer: {
-    marginTop: 20,
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  timePickerButton: {
-    padding: 12,
-    backgroundColor: "#007bff",
-    borderRadius: 5,
+  loadingText: {
+    ...typography.bodySmall,
   },
-  buttonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "bold",
+  timeBtn: {
+    backgroundColor: themeColors.accent,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
   },
-  selectedTime: {
-    fontSize: 18,
-    marginTop: 10,
-    color: "#333",
+  timeBtnText: {
+    color: themeColors.white,
+    fontWeight: '600',
+    fontSize: fontSizes.base,
   },
-  confirmButton: {
-    padding: 15,
-    backgroundColor: "#28a745",
-    borderRadius: 5,
-    marginTop: 30,
+  confirmBtn: {
+    marginTop: spacing.lg,
   },
 });
 
