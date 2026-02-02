@@ -13,15 +13,13 @@ import Card from '../../components/common/Card';
 import { NotificationBadge } from '../../components/common/NotificationBadge';
 import { OptimizedImage } from '../../components/common/OptimizedImage';
 import { AntDesign } from '@expo/vector-icons';
-import { loadUserData, UserData as initialUserData } from '../../data/UserData';
-import { clearAuth } from '../../services/auth';
+import { loadUserData, UserData } from '../../data/UserData';
+import { clearAuth, updateStoredUser } from '../../services/auth';
 import NotificationService from '../../services/notifications';
 import { useTheme } from '../../context/ThemeContext';
 import {
-  colors,
   fontSizes,
   spacing,
-  borderRadius,
   typography,
 } from '../../theme';
 
@@ -39,9 +37,29 @@ function resolveAvatarUri(profilePic) {
 
 const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' };
 
-const Account = ({ navigation }) => {
-  const { themeMode, setThemeMode, isDark } = useTheme();
-  const [user, setUser] = useState(initialUserData);
+function apiUserToDisplayUser(apiUser) {
+  if (!apiUser) return null;
+  const pic = apiUser.profilePic ?? apiUser.profile_pic;
+  const profilePicUrl =
+    (Array.isArray(pic) && pic[0]?.url) ? pic[0].url
+    : (pic && typeof pic === 'object' && pic.url) ? pic.url
+    : (typeof pic === 'string' ? pic : null) || DEFAULT_AVATAR;
+  return {
+    _id: apiUser.id ?? apiUser._id ?? '',
+    profilePic: profilePicUrl,
+    name: apiUser.name ?? 'Unknown',
+    email: apiUser.email ?? '',
+    role: apiUser.role ?? '',
+    phone: apiUser.phone ?? '',
+    location: apiUser.location ?? '',
+    preferences: apiUser.preferences ?? '',
+    specialization: apiUser.specialization ?? '',
+  };
+}
+
+const Account = ({ navigation, route }) => {
+  const { themeMode, setThemeMode, colors } = useTheme();
+  const [user, setUser] = useState(() => ({ ...UserData }));
   const [unreadCount, setUnreadCount] = useState(0);
 
   const handleAppearancePress = () => {
@@ -60,13 +78,27 @@ const Account = ({ navigation }) => {
   useEffect(() => {
     const fetchUserData = async () => {
       await loadUserData();
-      setUser({ ...initialUserData });
+      setUser({ ...UserData });
     };
     fetchUserData();
   }, []);
 
+  // When Profile navigates back with refreshedUser, update UI immediately (params can arrive after focus)
+  useEffect(() => {
+    const refreshed = route.params?.refreshedUser;
+    if (refreshed) {
+      const displayUser = apiUserToDisplayUser(refreshed);
+      if (displayUser) {
+        setUser(displayUser);
+        updateStoredUser(refreshed);
+      }
+      navigation.setParams({ refreshedUser: undefined });
+    }
+  }, [route.params?.refreshedUser, navigation]);
+
   useFocusEffect(
     useCallback(() => {
+      loadUserData().then(() => setUser({ ...UserData }));
       NotificationService.getUnreadCount().then(setUnreadCount);
     }, [])
   );
@@ -152,61 +184,62 @@ const Account = ({ navigation }) => {
       >
         <View style={styles.profileSection}>
           <OptimizedImage
+            key={resolveAvatarUri(user.profilePic)}
             source={{ uri: resolveAvatarUri(user.profilePic) }}
-            style={styles.avatar}
+            style={[styles.avatar, { backgroundColor: colors.gray200 }]}
             resizeMode="cover"
           />
-          <Text style={styles.greeting}>
-            Hi <Text style={styles.nameHighlight}>{user.name}</Text>
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            Hi <Text style={[styles.nameHighlight, { color: colors.success }]}>{user.name}</Text>
           </Text>
-          <Text style={styles.email}>{user.email}</Text>
+          <Text style={[styles.email, { color: colors.textSecondary }]}>{user.email}</Text>
           {user.phone ? (
-            <Text style={styles.meta}>Contact: {user.phone}</Text>
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>Contact: {user.phone}</Text>
           ) : null}
           {user.location ? (
-            <Text style={styles.meta}>Location: {user.location}</Text>
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>Location: {user.location}</Text>
           ) : null}
           {user.role === 'Customer' &&
             (user.preferences ? (
-              <Text style={styles.meta}>Preferences: {user.preferences}</Text>
+              <Text style={[styles.meta, { color: colors.textSecondary }]}>Preferences: {user.preferences}</Text>
             ) : (
               <TouchableOpacity onPress={handleSetPreferences}>
-                <Text style={styles.link}>Set preferences</Text>
+                <Text style={[styles.link, { color: colors.secondary }]}>Set preferences</Text>
               </TouchableOpacity>
             ))}
           {user.role === 'Barber' &&
             (user.specialization ? (
-              <Text style={styles.meta}>Specialization: {user.specialization}</Text>
+              <Text style={[styles.meta, { color: colors.textSecondary }]}>Specialization: {user.specialization}</Text>
             ) : (
               <TouchableOpacity onPress={handleSetSpecialization}>
-                <Text style={styles.link}>Set specialization</Text>
+                <Text style={[styles.link, { color: colors.secondary }]}>Set specialization</Text>
               </TouchableOpacity>
             ))}
         </View>
 
         <Card style={styles.menuCard}>
-          <Text style={styles.menuTitle}>Account</Text>
+          <Text style={[styles.menuTitle, { color: colors.text, borderBottomColor: colors.border }]}>Account</Text>
           {menuItems.map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={styles.menuRow}
+              style={[styles.menuRow, { borderBottomColor: colors.border }]}
               onPress={item.onPress}
               activeOpacity={0.8}
             >
               <AntDesign
                 name={item.icon}
                 size={20}
-                color={colors.gray600}
+                color={colors.text}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Text style={[styles.menuLabel, { color: colors.text }]}>{item.label}</Text>
               {item.rightLabel ? (
-                <Text style={styles.menuRightLabel}>{item.rightLabel}</Text>
+                <Text style={[styles.menuRightLabel, { color: colors.textSecondary }]}>{item.rightLabel}</Text>
               ) : null}
               {item.badge != null && item.badge > 0 ? (
                 <NotificationBadge count={item.badge} style={styles.badge} />
               ) : null}
-              <AntDesign name="right" size={16} color={colors.gray400} />
+              <AntDesign name="right" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
           <TouchableOpacity
@@ -219,8 +252,8 @@ const Account = ({ navigation }) => {
             activeOpacity={0.8}
           >
             <AntDesign name="logout" size={20} color={colors.error} />
-            <Text style={styles.logoutText}>Log out</Text>
-            <AntDesign name="right" size={16} color={colors.gray400} />
+            <Text style={[styles.logoutText, { color: colors.error }]}>Log out</Text>
+            <AntDesign name="right" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </Card>
       </ScrollView>
@@ -242,16 +275,14 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    resizeMode: 'cover',
     marginBottom: spacing.md,
-    backgroundColor: colors.gray200,
   },
   greeting: {
     ...typography.sectionTitle,
     marginBottom: spacing.xs,
   },
   nameHighlight: {
-    color: colors.success,
+    fontWeight: '600',
   },
   email: {
     ...typography.bodySmall,
@@ -262,7 +293,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   link: {
-    color: colors.secondary,
     fontWeight: '600',
     marginTop: spacing.sm,
   },
@@ -275,15 +305,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   menuIcon: {
     marginRight: spacing.md,
@@ -291,11 +319,9 @@ const styles = StyleSheet.create({
   menuLabel: {
     flex: 1,
     fontSize: fontSizes.base,
-    color: colors.text,
   },
   menuRightLabel: {
     fontSize: fontSizes.sm,
-    color: colors.textSecondary,
     marginRight: spacing.sm,
   },
   badge: {
@@ -307,7 +333,6 @@ const styles = StyleSheet.create({
   logoutText: {
     flex: 1,
     fontSize: fontSizes.base,
-    color: colors.error,
     fontWeight: '600',
   },
 });

@@ -3,7 +3,9 @@
  * Respects cache headers (Cloudinary); 3 retries before showing placeholder.
  */
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Image, Animated, StyleSheet } from 'react-native';
+import { View, Image, Animated, StyleSheet, Platform } from 'react-native';
+
+const useNativeDriver = Platform.OS !== 'web';
 
 const MAX_RETRIES = 3;
 const FADE_DURATION = 300;
@@ -30,7 +32,7 @@ export function OptimizedImage({
     Animated.timing(opacity, {
       toValue: 1,
       duration: FADE_DURATION,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
     onLoad?.();
   }, [opacity, onLoad]);

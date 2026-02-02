@@ -86,9 +86,20 @@ api.interceptors.response.use(
 /**
  * Centralized API error message for user-facing toasts/alerts.
  * Prefers backend message/validation errors, falls back to status or generic message.
+ * For network errors, returns a hint to run the backend and check EXPO_PUBLIC_API_URL.
  */
 export function getApiErrorMessage(err, fallback = 'Something went wrong.') {
   if (!err) return fallback;
+  const isNetworkError =
+    err.message === 'Network Error' ||
+    err.code === 'ERR_NETWORK' ||
+    (err.response == null && err.request != null);
+  if (isNetworkError) {
+    return (
+      "Can't reach the server. Make sure the backend is running (e.g. python manage.py runserver 0.0.0.0:8000) " +
+      "and your device is on the same Wi‑Fi. If using a physical device, set EXPO_PUBLIC_API_URL in .env to your computer's IP (e.g. http://YOUR_IP:8000/api)."
+    );
+  }
   const data = err.response?.data;
   const msg = data?.message ?? data?.detail ?? data?.error;
   if (msg && typeof msg === 'string') return msg;

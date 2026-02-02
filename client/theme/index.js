@@ -1,9 +1,11 @@
 /**
  * BSBS Design System – mobile-first barber shop app.
  * Supports light/dark themes; use useTheme() for reactive colors.
+ * On web, uses boxShadow to avoid "shadow*" deprecation warnings.
  */
+import { Platform } from 'react-native';
 
-const SHADOWS_PRESETS = {
+const SHADOWS_NATIVE = {
   sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -26,7 +28,14 @@ const SHADOWS_PRESETS = {
     elevation: 8,
   },
 };
-export const shadows = SHADOWS_PRESETS;
+
+const SHADOWS_WEB = {
+  sm: { boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
+  md: { boxShadow: '0 2px 6px rgba(0,0,0,0.08)' },
+  lg: { boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+};
+
+export const shadows = Platform.OS === 'web' ? SHADOWS_WEB : SHADOWS_NATIVE;
 
 /** Theme color sets – use themes.light / themes.dark or useTheme() */
 export const themes = {

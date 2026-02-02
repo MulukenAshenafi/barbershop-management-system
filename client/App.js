@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useRef, useEffect, useState } from "react";
 import { View, ActivityIndicator, StyleSheet, Linking, Alert } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -213,7 +214,7 @@ function PushNotificationSetup({ isAuth, navigationRef }) {
 function parseInviteUrl(url) {
   if (!url || typeof url !== "string") return null;
   try {
-    const u = url.replace(/^abush:\/\//, "https://x/").replace(/^abush:\//, "https://x/");
+    const u = url.replace(/^barberbook:\/\//, "https://x/").replace(/^barberbook:\//, "https://x/");
     const parsed = new URL(u);
     const token = parsed.searchParams.get("token");
     return token ? token.trim() : null;
@@ -249,7 +250,7 @@ export default function App() {
         return;
       }
       try {
-        const u = url.replace(/^abush:\/\//, "https://x/").replace(/^abush:\//, "https://x/");
+        const u = url.replace(/^barberbook:\/\//, "https://x/").replace(/^barberbook:\//, "https://x/");
         const parsed = new URL(u);
         const path = parsed.pathname || "";
         const nav = navigationRef.current;
@@ -275,6 +276,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <SafeAreaProvider>
       <ThemeProvider>
         <ToastProvider>
           <ApiHandlersSetup navigationRef={navigationRef} />
@@ -287,7 +289,7 @@ export default function App() {
                   <ThemedNavigationContainer
                     navigationRef={navigationRef}
                     linking={{
-                      prefixes: ["abush://"],
+                      prefixes: ["barberbook://"],
                       config: {
                         screens: {
                           myappointments: "booking/:bookingId",
@@ -307,6 +309,9 @@ export default function App() {
                   <Stack.Screen name="register" component={Register} options={{ headerShown: false }} />
                   <Stack.Screen name="join-barbershop" component={JoinBarbershopScreen} options={{ title: "Join Barbershop" }} />
                   <Stack.Screen name="home" component={Home} options={{ headerShown: false }} />
+                  <Stack.Screen name="ExploreShops" component={ExploreShopsScreen} options={{ title: "Explore Shops" }} />
+                  <Stack.Screen name="ShopPublicProfile" component={ShopPublicProfileScreen} options={{ title: "Shop" }} />
+                  <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: "Reviews" }} />
                   <Stack.Screen name="productDetails" component={ProductDetails} />
                   <Stack.Screen name="serviceDetails" component={ServiceDetails} />
                   <Stack.Screen name="checkout" component={Checkout} />
@@ -342,6 +347,7 @@ export default function App() {
           </CartProvider>
         </ToastProvider>
       </ThemeProvider>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

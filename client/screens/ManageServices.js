@@ -6,12 +6,14 @@ import {
   View,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import axios from "axios";
 import { Picker } from "@react-native-picker/picker";
 import { useNavigation } from "@react-navigation/native";
 import config from "../config";
+import { getFileForFormData } from "../utils/imageUpload";
 
 const ManageServices = () => {
   const [name, setName] = useState("");
@@ -20,7 +22,8 @@ const ManageServices = () => {
   const [category, setCategory] = useState("");
   const [duration, setDuration] = useState("");
   const [image, setImage] = useState(null);
-  const [showForm, setShowForm] = useState(false); // Toggle form visibility
+  const [showForm, setShowForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigation = useNavigation();
 
   // Function to handle image picking
@@ -45,39 +48,34 @@ const ManageServices = () => {
     }
   };
 
-  // Function to handle form submission
   const handleSubmit = async () => {
     if (!name || !description || !price || !category || !duration || !image) {
       Alert.alert("Validation Error", "All fields and image are required.");
       return;
     }
-
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("description", description);
-    formData.append("price", price);
-    formData.append("category", category);
-    formData.append("duration", duration);
-
-    const uriParts = image.split(".");
-    const fileType = uriParts[uriParts.length - 1];
-    formData.append("file", {
-      uri: image,
-      name: `service-image.${fileType}`,
-      type: `image/${fileType}`,
-    });
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("description", description);
+      formData.append("price", price);
+      formData.append("category", category);
+      formData.append("duration", duration);
+
+      const file = await getFileForFormData(image, "service-image.jpg", "image/jpeg");
+      if (file) formData.append("file", file);
+
       await axios.post(`${config.apiBaseUrl}/service/create`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": false },
       });
       Alert.alert("Success", "Service created successfully");
       navigation.goBack();
     } catch (error) {
       console.error("Error creating service:", error);
       Alert.alert("Error", "Failed to create service");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -147,8 +145,16 @@ const ManageServices = () => {
             <Text style={styles.imageButtonText}>Select Image</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Create Service</Text>
+          <TouchableOpacity
+            style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Create Service</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}

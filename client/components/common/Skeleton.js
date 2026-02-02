@@ -3,7 +3,9 @@
  * Variants: Skeleton.Text, Skeleton.Card, Skeleton.Avatar, Skeleton.List
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Easing } from 'react-native';
+import { View, Animated, StyleSheet, Easing, Platform } from 'react-native';
+
+const useNativeDriver = Platform.OS !== 'web';
 
 const SHIMMER_DURATION = 1200;
 
@@ -16,13 +18,13 @@ function useShimmer() {
         Animated.timing(translateX, {
           toValue: 1,
           duration: SHIMMER_DURATION,
-          useNativeDriver: true,
+          useNativeDriver,
           easing: Easing.inOut(Easing.ease),
         }),
         Animated.timing(translateX, {
           toValue: -1,
           duration: 0,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );

@@ -14,11 +14,14 @@ import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { FontAwesome } from "@expo/vector-icons";
 import { shadows } from "../theme";
+import { useTheme } from "../context/ThemeContext";
+import { getFileForFormData } from "../utils/imageUpload";
 
 // Define the backend API endpoint
 const API_URL = "http://10.139.55.179:8080/api/products"; // Update this with your actual API URL
 
 const ManageProduct = ({ navigation }) => {
+  const { colors } = useTheme();
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [form, setForm] = useState({
@@ -29,6 +32,7 @@ const ManageProduct = ({ navigation }) => {
     category: "",
   });
   const [image, setImage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -63,7 +67,8 @@ const ManageProduct = ({ navigation }) => {
 
   const handleProductSubmit = async () => {
     if (!validateForm()) return;
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const { name, description, price, stock, category } = form;
     try {
       if (selectedProduct) {
@@ -84,16 +89,12 @@ const ManageProduct = ({ navigation }) => {
         data.append("stock", stock);
         data.append("category", category);
         if (image) {
-          data.append("image", {
-            uri: image.uri,
-            type: "image/jpeg",
-            name: "product.jpg",
-          });
+          const uri = image.assets?.[0]?.uri ?? image.uri;
+          const file = await getFileForFormData(uri, "product.jpg", "image/jpeg");
+          if (file) data.append("image", file);
         }
         await axios.post(`${API_URL}/create`, data, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": false },
         });
       }
       fetchProducts();
@@ -101,6 +102,8 @@ const ManageProduct = ({ navigation }) => {
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Failed to submit product. Please try again later.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -146,11 +149,11 @@ const ManageProduct = ({ navigation }) => {
   };
 
   const renderProductItem = ({ item }) => (
-    <View style={styles.productItem}>
+    <View style={[styles.productItem, { backgroundColor: colors.card }]}>
       <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
       <View style={styles.productInfo}>
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>${item.price}</Text>
+        <Text style={[styles.productName, { color: colors.text }]}>{item.name}</Text>
+        <Text style={[styles.productPrice, { color: colors.textSecondary }]}>${item.price}</Text>
         <View style={styles.productActions}>
           <TouchableOpacity
             style={styles.actionButton}
@@ -170,50 +173,61 @@ const ManageProduct = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Manage Products</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.heading, { color: colors.text }]}>Manage Products</Text>
       <FlatList
         data={products}
         renderItem={renderProductItem}
         keyExtractor={(item) => item._id}
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
         placeholder="Name"
+        placeholderTextColor={colors.textSecondary}
         value={form.name}
         onChangeText={(text) => handleInputChange("name", text)}
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
         placeholder="Description"
+        placeholderTextColor={colors.textSecondary}
         value={form.description}
         onChangeText={(text) => handleInputChange("description", text)}
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
         placeholder="Price"
+        placeholderTextColor={colors.textSecondary}
         value={form.price}
         onChangeText={(text) => handleInputChange("price", text)}
         keyboardType="numeric"
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
         placeholder="Stock"
+        placeholderTextColor={colors.textSecondary}
         value={form.stock}
         onChangeText={(text) => handleInputChange("stock", text)}
         keyboardType="numeric"
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
         placeholder="Category"
+        placeholderTextColor={colors.textSecondary}
         value={form.category}
         onChangeText={(text) => handleInputChange("category", text)}
       />
       <Button title="Select Image" onPress={handleImageUpload} />
-      {image && <Image source={{ uri: image.uri }} style={styles.image} />}
+      {image && (
+        <Image
+          source={{ uri: image.assets?.[0]?.uri ?? image.uri }}
+          style={styles.image}
+        />
+      )}
       <Button
         title={selectedProduct ? "Update Product" : "Create Product"}
         onPress={handleProductSubmit}
+        disabled={isSubmitting}
       />
       <Button title="Reset Form" onPress={resetForm} />
     </View>
@@ -223,7 +237,6 @@ const ManageProduct = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
     padding: 20,
   },
   heading: {
@@ -233,7 +246,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   productItem: {
-    backgroundColor: "#ffffff",
     padding: 15,
     marginVertical: 8,
     borderRadius: 10,
@@ -256,7 +268,6 @@ const styles = StyleSheet.create({
   },
   productPrice: {
     fontSize: 14,
-    color: "#444",
   },
   productActions: {
     flexDirection: "row",
@@ -267,7 +278,6 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 40,
-    borderColor: "#ddd",
     borderWidth: 1,
     marginBottom: 10,
     paddingHorizontal: 10,

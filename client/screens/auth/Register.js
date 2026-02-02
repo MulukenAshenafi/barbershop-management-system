@@ -20,6 +20,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import api, { getApiErrorMessage } from '../../services/api';
 import { setAuth } from '../../services/auth';
+import { getFileForFormData } from '../../utils/imageUpload';
 import { fontSizes, spacing, borderRadius, typography } from '../../theme';
 
 const defaultProfileImage =
@@ -59,6 +60,7 @@ const Register = ({ navigation }) => {
       toast.show('Please fill in all required fields', { type: 'error' });
       return;
     }
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -69,16 +71,11 @@ const Register = ({ navigation }) => {
       formData.append('phone', contact);
       formData.append('location', location);
       if (image) {
-        const uriParts = image.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        formData.append('file', {
-          uri: image,
-          name: `profile-pic.${fileType}`,
-          type: `image/${fileType}`,
-        });
+        const file = await getFileForFormData(image, 'profile-pic.jpg', 'image/jpeg');
+        if (file) formData.append('file', file);
       }
       const res = await api.post('customers/signup', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': false },
       });
       setResponse(res.data);
     } catch (err) {
@@ -132,13 +129,14 @@ const Register = ({ navigation }) => {
       >
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Create account</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Join Abush Barber Shop</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Join BarberBook</Text>
         </View>
 
         <View style={styles.avatarWrap}>
           <Image
             source={{ uri: image || defaultProfileImage }}
             style={styles.avatar}
+            resizeMode="cover"
           />
           <TouchableOpacity
             style={[styles.avatarBtn, { backgroundColor: colors.primary }]}
@@ -161,6 +159,7 @@ const Register = ({ navigation }) => {
             title="Sign up"
             onPress={handleSignUp}
             loading={loading}
+            disabled={loading}
             fullWidth
             style={styles.primaryBtn}
           />
@@ -198,7 +197,6 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    resizeMode: 'cover',
     marginBottom: spacing.sm,
   },
   avatarBtn: {

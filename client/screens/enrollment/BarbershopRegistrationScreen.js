@@ -20,6 +20,7 @@ import { Button } from '../../components/common/Button';
 import { colors, fontSizes, spacing, typography } from '../../theme';
 import api from '../../services/api';
 import { useBarbershop } from '../../context/BarbershopContext';
+import { getFileForFormData } from '../../utils/imageUpload';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DEFAULT_HOURS = { open: '09:00', close: '18:00' };
@@ -101,19 +102,17 @@ export default function BarbershopRegistrationScreen() {
       Alert.alert('Validation', 'Please fill all required fields and use a valid Ethiopian phone (+251 9xxxxxxxx).');
       return;
     }
+    if (submitting) return;
     setSubmitting(true);
     try {
       const payload = buildPayload();
       if (logoUri) {
         const formData = new FormData();
         Object.keys(payload).forEach((k) => formData.append(k, k === 'opening_hours' ? JSON.stringify(payload[k]) : payload[k]));
-        formData.append('logo', {
-          uri: logoUri,
-          type: 'image/jpeg',
-          name: 'logo.jpg',
-        });
+        const logoFile = await getFileForFormData(logoUri, 'logo.jpg', 'image/jpeg');
+        if (logoFile) formData.append('logo', logoFile);
         const { data } = await api.post('/barbershops/register/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: { 'Content-Type': false },
         });
         if (data.barbershop?.id) {
           await loadMyShops();

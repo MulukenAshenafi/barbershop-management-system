@@ -1,33 +1,25 @@
-
-// Importing the images from assets
-const barberShop1 = require("../assets/banner1.jpeg");
-const barberShop2 = require("../assets/banner 2.jpeg");
-const barberShop3 = require("../assets/banner3.jpeg");
-const barberShop4 = require("../assets/banner4.jpeg");
+// BarberBook banners (premium assets)
+const banner1 = require("../assets/Banner 1Hero-Discovery.jpeg");
+const banner2 = require("../assets/Banner 2 Services-Experience.jpeg");
+const banner3 = require("../assets/Banner 3 Call to Action - Offers.jpeg");
 
 export const BannerData = [
   {
     _id: 1,
-    coverImageUri: barberShop1,
-    cornerLabelColor: "#FFD300",
-    cornerLabelText: "Book Now",
+    coverImageUri: banner1,
+    cornerLabelColor: "#1a1a2e",
+    cornerLabelText: "Find & Book",
   },
   {
     _id: 2,
-    coverImageUri: barberShop2,
-    cornerLabelColor: "#0080ff",
-    cornerLabelText: "Discounts",
+    coverImageUri: banner2,
+    cornerLabelColor: "#0f3460",
+    cornerLabelText: "Services",
   },
   {
     _id: 3,
-    coverImageUri: barberShop3,
-    cornerLabelColor: "#2ECC40",
+    coverImageUri: banner3,
+    cornerLabelColor: "#28a745",
     cornerLabelText: "Special Offers",
-  },
-  {
-    _id: 4,
-    coverImageUri: barberShop4,
-    cornerLabelColor: "#2ECC40",
-    cornerLabelText: "Premium",
   },
 ];

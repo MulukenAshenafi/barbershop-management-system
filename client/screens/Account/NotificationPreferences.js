@@ -10,21 +10,25 @@ import {
 } from 'react-native';
 import Layout from '../../components/Layout/Layout';
 import api from '../../services/api';
-import { colors, fontSizes, spacing, typography } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { colors as themeColorsFallback, fontSizes, spacing, typography } from '../../theme';
 
-const PreferenceRow = ({ label, value, onValueChange }) => (
+
+const PreferenceRow = ({ label, value, onValueChange, colors }) => (
   <View style={styles.row}>
-    <Text style={styles.label}>{label}</Text>
+    <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
     <Switch
       value={value}
       onValueChange={onValueChange}
       trackColor={{ false: colors.gray300, true: colors.primary }}
-      thumbColor="#fff"
+      thumbColor={colors.white}
     />
   </View>
 );
 
 const NotificationPreferences = () => {
+  const { colors: themeColors } = useTheme();
+  const colors = themeColors ?? themeColorsFallback;
   const [prefs, setPrefs] = useState({
     notifications_enabled: true,
     notify_booking_confirmations: true,
@@ -83,34 +87,39 @@ const NotificationPreferences = () => {
 
   return (
     <Layout>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Notification settings</Text>
-        <Text style={styles.subtitle}>
+      <ScrollView style={[styles.scroll, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+        <Text style={[styles.title, { color: colors.text }]}>Notification settings</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Control which push notifications you receive. Disabling "All notifications" turns off all
           pushes.
         </Text>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
           <PreferenceRow
+            colors={colors}
             label="All notifications"
             value={prefs.notifications_enabled}
             onValueChange={(v) => update('notifications_enabled', v)}
           />
           <PreferenceRow
+            colors={colors}
             label="Booking confirmations"
             value={prefs.notify_booking_confirmations}
             onValueChange={(v) => update('notify_booking_confirmations', v)}
           />
           <PreferenceRow
+            colors={colors}
             label="24 hours before appointment"
             value={prefs.notify_24h_reminders}
             onValueChange={(v) => update('notify_24h_reminders', v)}
           />
           <PreferenceRow
+            colors={colors}
             label="1 hour before appointment"
             value={prefs.notify_1h_reminders}
             onValueChange={(v) => update('notify_1h_reminders', v)}
           />
           <PreferenceRow
+            colors={colors}
             label="Order updates"
             value={prefs.notify_orders}
             onValueChange={(v) => update('notify_orders', v)}
@@ -119,7 +128,7 @@ const NotificationPreferences = () => {
         {saving && (
           <View style={styles.saving}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.savingText}>Saving…</Text>
+            <Text style={[styles.savingText, { color: colors.textSecondary }]}>Saving…</Text>
           </View>
         )}
       </ScrollView>
@@ -136,11 +145,11 @@ const styles = StyleSheet.create({
   title: { ...typography.sectionTitle, marginBottom: spacing.xs },
   subtitle: {
     fontSize: fontSizes.sm,
-    color: colors.textSecondary,
+    color: themeColorsFallback.textSecondary,
     marginBottom: spacing.lg,
   },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: themeColorsFallback.card,
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -151,9 +160,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.gray200,
+    borderBottomColor: themeColorsFallback.gray200,
   },
-  label: { fontSize: fontSizes.base, color: colors.text },
+  label: { fontSize: fontSizes.base, color: themeColorsFallback.text },
   saving: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,5 +170,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     gap: spacing.sm,
   },
-  savingText: { fontSize: fontSizes.sm, color: colors.textSecondary },
+  savingText: { fontSize: fontSizes.sm, color: themeColorsFallback.textSecondary },
 });

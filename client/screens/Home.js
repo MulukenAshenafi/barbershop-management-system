@@ -29,9 +29,9 @@ const Home = () => {
       >
         <Header />
         <View style={styles.hero}>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>Abush Barber Shop</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>BarberBook</Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Style meets excellence — book your cut or explore our products.
+            Find and book barbershops near you — services, products, and appointments in one app.
           </Text>
           <TouchableOpacity
             style={[styles.exploreBtn, { backgroundColor: colors.primary }]}

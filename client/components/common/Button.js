@@ -17,6 +17,8 @@ import {
   touchTargetMin,
 } from '../../theme';
 
+const useNativeDriver = Platform.OS !== 'web';
+
 let haptics = null;
 try {
   haptics = require('expo-haptics');
@@ -63,7 +65,7 @@ export function Button({
   const handlePressIn = () => {
     Animated.spring(scale, {
       toValue: 0.96,
-      useNativeDriver: true,
+      useNativeDriver,
       speed: 50,
       bounciness: 4,
     }).start();
@@ -75,7 +77,7 @@ export function Button({
   const handlePressOut = () => {
     Animated.spring(scale, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver,
       speed: 50,
       bounciness: 8,
     }).start();

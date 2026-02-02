@@ -3,10 +3,13 @@
 import { Platform } from "react-native";
 
 const getApiBaseUrl = () => {
+  // Web: always use localhost so browser can reach backend (avoids device IP / CORS)
+  if (Platform.OS === "web") {
+    return "http://localhost:8000/api";
+  }
   const raw = typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
     ? String(process.env.EXPO_PUBLIC_API_URL).trim()
     : "";
-  // Reject exp:// and any non-HTTP(S) URL so we never pass them to axios
   const envUrl = raw && !/^exp:\/\//i.test(raw) && /^https?:\/\//i.test(raw) ? raw : "";
   if (envUrl) {
     return envUrl.replace(/\/$/, "");
@@ -15,7 +18,7 @@ const getApiBaseUrl = () => {
   if (Platform.OS === "android") {
     return "http://10.0.2.2:8000/api";
   }
-  // Web / iOS simulator: backend on same machine
+  // iOS simulator: backend on same machine
   return "http://localhost:8000/api";
 };
 

@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { loginWithEmail } from '../../services/authService';
 import { fontSizes, spacing, borderRadius, typography } from '../../theme';
 
-const abushLogo = require('../../assets/a-logo-for-a-abush-barber-shop.jpeg');
+const barberBookLogo = require('../../assets/Logo — BarberBook Brand.jpeg');
 
 const Login = ({ navigation }) => {
   const { colors } = useTheme();
@@ -54,7 +54,7 @@ const Login = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.logoContainer}>
-          <Image source={abushLogo} style={styles.logo} />
+          <Image source={barberBookLogo} style={styles.logo} resizeMode="contain" />
           <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome back</Text>
           <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>Sign in to continue</Text>
         </View>
@@ -91,7 +91,7 @@ const Login = ({ navigation }) => {
         </Card>
 
         <Text style={[styles.copyright, { color: colors.textSecondary }]}>
-          ©{new Date().getFullYear()} Abush Barber Shop
+          ©{new Date().getFullYear()} BarberBook
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -114,7 +114,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: borderRadius.lg,
-    resizeMode: 'contain',
     marginBottom: spacing.md,
   },
   welcomeTitle: {

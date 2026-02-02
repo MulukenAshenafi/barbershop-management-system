@@ -16,6 +16,8 @@ import { OptimizedImage } from '../../components/common/OptimizedImage';
 import { useToast } from '../../components/common/Toast';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
+import { updateStoredUser } from '../../services/auth';
+import { getFileForFormData } from '../../utils/imageUpload';
 import { spacing, typography, borderRadius } from '../../theme';
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/3177/3177440.png';
@@ -46,6 +48,7 @@ const Profile = ({ route, navigation }) => {
   const [newImage, setNewImage] = useState(null);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleImagePick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -67,6 +70,8 @@ const Profile = ({ route, navigation }) => {
       toast.show('Please provide all fields', { type: 'error' });
       return;
     }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('name', name);
@@ -75,17 +80,15 @@ const Profile = ({ route, navigation }) => {
       formData.append('location', location);
       formData.append('preferencesOrSpecialization', extraField);
       if (newImage) {
-        const uriParts = newImage.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        formData.append('file', {
-          uri: newImage,
-          name: `profile-pic.${fileType}`,
-          type: `image/${fileType}`,
-        });
+        const file = await getFileForFormData(newImage, 'profile-pic.jpg', 'image/jpeg');
+        if (file) formData.append('file', file);
       }
       const res = await api.put('customers/update-profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': false }, // Let axios set multipart/form-data with boundary for FormData
       });
+      if (res.data?.success && res.data?.user) {
+        await updateStoredUser(res.data.user);
+      }
       setResponse(res.data);
     } catch (err) {
       setError(
@@ -93,13 +96,15 @@ const Profile = ({ route, navigation }) => {
           err.message ||
           'An unknown error occurred.'
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   useEffect(() => {
     if (response?.success) {
       toast.show('Profile updated', { type: 'success' });
-      navigation.navigate('account');
+      navigation.navigate('account', { refreshedUser: response.user });
     } else if (response && !response.success) {
       toast.show(response.message || 'An error occurred.', { type: 'error' });
     }
@@ -177,6 +182,8 @@ const Profile = ({ route, navigation }) => {
           onPress={handleUpdate}
           variant="primary"
           fullWidth
+          loading={isSubmitting}
+          disabled={isSubmitting}
           style={styles.updateBtn}
         />
       </Card>

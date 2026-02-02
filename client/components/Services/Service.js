@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, Text } from 'react-native';
 import ServiceCard from './ServiceCard';
-import api from '../../services/api';
+import api, { getApiErrorMessage } from '../../services/api';
 import { SkeletonCard } from '../common/SkeletonBox';
 import { ErrorView } from '../common/ErrorView';
 import EmptyState from '../common/EmptyState';
@@ -25,7 +25,7 @@ const Services = () => {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e.response?.data?.message || 'Failed to load services');
+          setError(getApiErrorMessage(e, 'Failed to load services'));
         }
       } finally {
         if (!cancelled) setLoading(false);

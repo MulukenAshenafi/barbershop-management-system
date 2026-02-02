@@ -16,26 +16,38 @@ export async function getStoredCustomer() {
   return raw ? JSON.parse(raw) : null;
 }
 
+function userToCustomerData(user) {
+  const pic = user.profilePic ?? user.profile_pic;
+  const profilePicUrl =
+    (Array.isArray(pic) && pic[0]?.url) ? pic[0].url
+    : (pic && typeof pic === 'object' && pic.url) ? pic.url
+    : (typeof pic === 'string' ? pic : null) || 'https://cdn-icons-png.flaticon.com/512/3177/3177440.png';
+  return {
+    customerId: user.id ?? user._id,
+    customerName: user.name ?? '',
+    customerEmail: user.email ?? '',
+    customerRole: user.role ?? '',
+    customerPhone: user.phone ?? '',
+    customerProfilePic: profilePicUrl,
+    customerLocation: user.location ?? '',
+    customerPreferences: user.preferences ?? '',
+    customerSpecialization: user.specialization ?? '',
+  };
+}
+
 export async function setAuth(data) {
   const { token, refreshToken, user } = data;
   if (token) await AsyncStorage.setItem(TOKEN, token);
   if (refreshToken) await AsyncStorage.setItem(REFRESH_TOKEN, refreshToken);
   if (user) {
-    const customerData = {
-      customerId: user.id ?? user._id,
-      customerName: user.name ?? '',
-      customerEmail: user.email ?? '',
-      customerRole: user.role ?? '',
-      customerPhone: user.phone ?? '',
-      customerProfilePic: Array.isArray(user.profilePic) && user.profilePic[0]?.url
-        ? user.profilePic[0].url
-        : user.profilePic || 'https://cdn-icons-png.flaticon.com/512/3177/3177440.png',
-      customerLocation: user.location ?? '',
-      customerPreferences: user.preferences ?? '',
-      customerSpecialization: user.specialization ?? '',
-    };
-    await AsyncStorage.setItem(CUSTOMER_DATA, JSON.stringify(customerData));
+    await AsyncStorage.setItem(CUSTOMER_DATA, JSON.stringify(userToCustomerData(user)));
   }
+}
+
+/** Update stored customer data from API user (e.g. after profile update). Preserves token. */
+export async function updateStoredUser(user) {
+  if (!user) return;
+  await AsyncStorage.setItem(CUSTOMER_DATA, JSON.stringify(userToCustomerData(user)));
 }
 
 export async function clearAuth() {

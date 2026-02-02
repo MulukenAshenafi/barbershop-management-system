@@ -17,8 +17,8 @@ import Button from '../../components/common/Button';
 import config from '../../config';
 import { isAuthenticated } from '../../services/auth';
 import { exchangeGoogleToken, loginWithApple } from '../../services/authService';
+import { useTheme } from '../../context/ThemeContext';
 import {
-  colors,
   fontSizes,
   spacing,
   typography,
@@ -31,6 +31,7 @@ const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation();
+  const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(null);
   const [googleReady, setGoogleReady] = useState(false);
 
@@ -111,18 +112,18 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <View style={styles.content}>
-        <Text style={styles.headline}>Book your cut.{'\n'}No hassle.</Text>
-        <Text style={styles.subhead}>
-          Abush Barber Shop — appointments, products, and style in one app.
+        <Text style={[styles.headline, { color: colors.text }]}>Book your cut.{'\n'}No hassle.</Text>
+        <Text style={[styles.subhead, { color: colors.textSecondary }]}>
+          BarberBook — find barbershops, book appointments, and shop products in one app.
         </Text>
 
         <View style={styles.ctas}>
           {googleReady && (
             <TouchableOpacity
-              style={[styles.socialBtn, loading && styles.socialBtnDisabled]}
+              style={[styles.socialBtn, { backgroundColor: colors.card, borderColor: colors.gray200 }, loading && styles.socialBtnDisabled]}
               onPress={handleGoogle}
               disabled={!!loading}
               activeOpacity={0.9}
@@ -132,7 +133,7 @@ export default function WelcomeScreen() {
               ) : (
                 <>
                   <Ionicons name="logo-google" size={22} color={colors.text} />
-                  <Text style={styles.socialBtnText}>Continue with Google</Text>
+                  <Text style={[styles.socialBtnText, { color: colors.text }]}>Continue with Google</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -140,7 +141,7 @@ export default function WelcomeScreen() {
 
           {Platform.OS === 'ios' && (
             <TouchableOpacity
-              style={[styles.socialBtn, styles.appleBtn, loading && styles.socialBtnDisabled]}
+              style={[styles.socialBtn, styles.appleBtn, { backgroundColor: colors.primary, borderColor: colors.primary }, loading && styles.socialBtnDisabled]}
               onPress={handleApple}
               disabled={!!loading}
               activeOpacity={0.9}
@@ -150,7 +151,7 @@ export default function WelcomeScreen() {
               ) : (
                 <>
                   <Ionicons name="logo-apple" size={22} color={colors.white} />
-                  <Text style={[styles.socialBtnText, styles.appleBtnText]}>
+                  <Text style={[styles.socialBtnText, styles.appleBtnText, { color: colors.white }]}>
                     Continue with Apple
                   </Text>
                 </>
@@ -174,8 +175,8 @@ export default function WelcomeScreen() {
           disabled={!!loading}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Text style={styles.loginLinkText}>
-            Already have an account? <Text style={styles.loginLinkBold}>Log in</Text>
+          <Text style={[styles.loginLinkText, { color: colors.textSecondary }]}>
+            Already have an account? <Text style={[styles.loginLinkBold, { color: colors.secondary }]}>Log in</Text>
           </Text>
         </TouchableOpacity>
       </View>
@@ -186,7 +187,6 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
@@ -216,26 +216,18 @@ const styles = StyleSheet.create({
     minHeight: touchTargetMin,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.gray200,
   },
   socialBtnDisabled: {
     opacity: 0.7,
   },
-  appleBtn: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
+  appleBtn: {},
   socialBtnText: {
     fontSize: fontSizes.base,
     fontWeight: '600',
-    color: colors.text,
   },
-  appleBtnText: {
-    color: colors.white,
-  },
+  appleBtnText: {},
   emailBtn: {
     marginTop: spacing.xs,
   },
@@ -248,7 +240,6 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
   },
   loginLinkBold: {
-    color: colors.secondary,
     fontWeight: '600',
   },
 });

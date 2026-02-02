@@ -8,7 +8,9 @@
  *   the user must acknowledge before continuing.
  */
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Text, Animated, StyleSheet } from 'react-native';
+import { Text, Animated, StyleSheet, Platform } from 'react-native';
+
+const useNativeDriver = Platform.OS !== 'web';
 import { useTheme } from '../../context/ThemeContext';
 
 const DEFAULT_DURATION = 3000;
@@ -26,7 +28,7 @@ export function ToastProvider({ children }) {
     setType(options.type || 'info');
     Animated.spring(translateY, {
       toValue: 0,
-      useNativeDriver: true,
+      useNativeDriver,
       speed: 50,
       bounciness: 8,
     }).start();
@@ -36,7 +38,7 @@ export function ToastProvider({ children }) {
       Animated.timing(translateY, {
         toValue: -100,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver,
       }).start(() => setMessage(null));
     }, duration);
     return () => clearTimeout(t);
@@ -46,7 +48,7 @@ export function ToastProvider({ children }) {
     Animated.timing(translateY, {
       toValue: -100,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start(() => setMessage(null));
   }, [translateY]);
 

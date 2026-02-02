@@ -3,7 +3,7 @@
  * Search by city/name, or "Find Near Me" (location + nearby API).
  * Toggle List View | Map View. Radius filter (1, 5, 10, 20 km). Distance on cards.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,13 +21,16 @@ import api from '../services/api';
 import LocationService from '../services/location';
 import NearbyShopsMap from './Explore/NearbyShopsMap';
 import { SkeletonList } from '../components/common/Skeleton';
-import { colors, fontSizes, spacing, typography } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { fontSizes, spacing, typography } from '../theme';
 
 const DEBOUNCE_MS = 400;
 const RADII = [1, 5, 10, 20];
 
 export default function ExploreShopsScreen() {
   const navigation = useNavigation();
+  const { colors } = useTheme();
+  const styles = useExploreStyles(colors);
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -247,7 +250,8 @@ export default function ExploreShopsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function useExploreStyles(colors) {
+  return useMemo(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   toggleRow: {
     flexDirection: 'row',
@@ -317,9 +321,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray200,
   },
   cardBody: { flex: 1, marginLeft: spacing.md },
-  shopName: { ...typography.sectionTitle, marginBottom: 4 },
-  shopCity: { ...typography.bodySmall },
-  shopAddress: { ...typography.caption, marginTop: 4 },
+  shopName: { ...typography.sectionTitle, marginBottom: 4, color: colors.text },
+  shopCity: { ...typography.bodySmall, color: colors.textSecondary },
+  shopAddress: { ...typography.caption, marginTop: 4, color: colors.textSecondary },
   distance: {
     fontSize: fontSizes.sm,
     color: colors.primary,
@@ -330,6 +334,7 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     textAlign: 'center',
     marginTop: spacing.xl,
+    color: colors.textSecondary,
   },
   hint: {
     ...typography.bodySmall,
@@ -338,4 +343,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   mapWrap: { flex: 1 },
-});
+  }), [colors]);
+}

@@ -2,10 +2,11 @@
  * Rating summary: large average, star display, progress bars per star level, total count, "Write a Review" CTA.
  */
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { StarRating } from '../common/StarRating';
 import { Button } from '../common/Button';
-import { colors, fontSizes, spacing, typography } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { fontSizes, spacing, typography } from '../../theme';
 
 export function RatingBreakdown({
   averageRating = 0,
@@ -14,8 +15,10 @@ export function RatingBreakdown({
   onWriteReview,
   showWriteButton = true,
 }) {
+  const { colors } = useTheme();
   const total = totalReviews || Object.values(ratingBreakdown).reduce((a, b) => a + b, 0);
   const maxCount = Math.max(1, ...Object.values(ratingBreakdown));
+  const styles = useRatingStyles(colors);
 
   return (
     <View style={styles.container}>
@@ -55,69 +58,72 @@ export function RatingBreakdown({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    padding: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    marginBottom: spacing.lg,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  avgBlock: {
-    alignItems: 'center',
-    marginRight: spacing.lg,
-    minWidth: 80,
-  },
-  avgNumber: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  totalText: {
-    ...typography.caption,
-    marginTop: spacing.xs,
-  },
-  barsBlock: {
-    flex: 1,
-  },
-  barRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  barLabel: {
-    fontSize: fontSizes.sm,
-    color: colors.text,
-    width: 12,
-    marginRight: spacing.sm,
-  },
-  barTrack: {
-    flex: 1,
-    height: 8,
-    backgroundColor: colors.gray200,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: colors.warning,
-    borderRadius: 4,
-  },
-  barCount: {
-    fontSize: fontSizes.sm,
-    color: colors.textSecondary,
-    width: 24,
-    textAlign: 'right',
-    marginLeft: spacing.sm,
-  },
-  writeBtn: {
-    marginTop: spacing.sm,
-  },
-});
+function useRatingStyles(colors) {
+  return React.useMemo(() => StyleSheet.create({
+    container: {
+      padding: spacing.md,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      marginBottom: spacing.lg,
+    },
+    topRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: spacing.md,
+    },
+    avgBlock: {
+      alignItems: 'center',
+      marginRight: spacing.lg,
+      minWidth: 80,
+    },
+    avgNumber: {
+      fontSize: 36,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: spacing.xs,
+    },
+    totalText: {
+      ...typography.caption,
+      marginTop: spacing.xs,
+      color: colors.textSecondary,
+    },
+    barsBlock: {
+      flex: 1,
+    },
+    barRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
+    },
+    barLabel: {
+      fontSize: fontSizes.sm,
+      color: colors.text,
+      width: 12,
+      marginRight: spacing.sm,
+    },
+    barTrack: {
+      flex: 1,
+      height: 8,
+      backgroundColor: colors.gray200,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    barFill: {
+      height: '100%',
+      backgroundColor: colors.warning,
+      borderRadius: 4,
+    },
+    barCount: {
+      fontSize: fontSizes.sm,
+      color: colors.textSecondary,
+      width: 24,
+      textAlign: 'right',
+      marginLeft: spacing.sm,
+    },
+    writeBtn: {
+      marginTop: spacing.sm,
+    },
+  }), [colors]);
+}
 
 export default RatingBreakdown;

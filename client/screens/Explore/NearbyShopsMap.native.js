@@ -1,5 +1,6 @@
 /**
  * Map view: user location (circle) and barbershop markers. Tap marker → ShopPublicProfile.
+ * Native only – react-native-maps is not supported on web. See NearbyShopsMap.web.js for web.
  */
 import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
