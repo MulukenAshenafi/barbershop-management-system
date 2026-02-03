@@ -44,10 +44,18 @@ htmlcov/
 *.swo
 *~
 
-# Environment and secrets
+# Environment and secrets – never bake into image
 .env
+.env.*
+!.env.example
+*.env
 .env.local
-firebase/*.json
+.env.production
+# Firebase and other credential files (build context is backend/)
+firebase/
+**/firebase/*.json
+**/*-adminsdk-*.json
+**/*credentials*.json
 
 # Git
 .git/

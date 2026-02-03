@@ -22,8 +22,9 @@ django-redis==5.4.0
 redis==5.0.1
 # JSON schema validation for opening_hours
 jsonschema==4.20.0
-# Production WSGI Server
+# Production WSGI server and static files (no volume needed on Render)
 gunicorn==21.2.0
+whitenoise==6.6.0
 # Celery (optional, for booking reminder pushes)
 celery==5.3.4
 django-celery-beat==2.5.0

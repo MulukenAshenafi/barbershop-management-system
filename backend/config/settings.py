@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 # Build paths: BASE_DIR = backend/, project root = BASE_DIR.parent
 BASE_DIR = Path(__file__).resolve().parent.parent
-# One .env at project root: works for Docker and local runs
+# Load .env from project root when present (local/dev). On Render, env is set by the platform.
 load_dotenv(BASE_DIR.parent / ".env")
 
 
@@ -22,7 +22,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-# Comma-separated list; default allows all when DEBUG=True (set explicitly in production)
+# Comma-separated list from env. In production set ALLOWED_HOSTS (e.g. your-app.onrender.com).
 _allowed = os.getenv('ALLOWED_HOSTS', '').strip()
 ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] if _allowed else ['*']
 
@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -86,16 +87,15 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+# Database – fully from environment (works with Docker Compose and Render PostgreSQL)
+# Local Docker: set DB_HOST=db. Render: set DB_HOST from Render Postgres internal hostname.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME', 'barbershop_db'),
         'USER': os.getenv('DB_USER', 'postgres'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),  # Defaults to 'db' in Docker, 'localhost' locally
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
@@ -136,8 +136,8 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
+# Local dev: Docker Compose may mount volumes for staticfiles/media. Production (e.g. Render): no volumes;
+# use WhiteNoise for static and Cloudinary or S3 for media (see below).
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -213,7 +213,7 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# CORS: comma-separated origins from env; default localhost for dev
+# CORS: fully from env. Set CORS_ALLOWED_ORIGINS (comma-separated) in production.
 _cors = os.getenv('CORS_ALLOWED_ORIGINS', '').strip()
 if _cors:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors.split(',') if o.strip()]
@@ -224,21 +224,24 @@ else:
     ]
 CORS_ALLOW_CREDENTIALS = True
 
-# Cloudinary Settings
+# Cloudinary (optional). When set, media uploads go to Cloudinary. Production: use Cloudinary or S3.
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_NAME', ''),
     'API_KEY': os.getenv('CLOUDINARY_API_KEY', ''),
     'API_SECRET': os.getenv('CLOUDINARY_SECRET', ''),
 }
-
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+_use_cloudinary = bool(os.getenv('CLOUDINARY_NAME', '').strip())
+if _use_cloudinary:
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+else:
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 
 # Chapa Payment Gateway Settings
 CHAPA_SECRET_KEY = os.getenv('CHAPA_SECRET_KEY', '')
 CHAPA_PUBLIC_KEY = os.getenv('CHAPA_PUBLIC_KEY', '')
 CHAPA_WEBHOOK_SECRET = os.getenv('CHAPA_WEBHOOK_SECRET', '')
 CHAPA_WEBHOOK_URL = os.getenv('CHAPA_WEBHOOK_URL', '')
-CHAPA_ENCRYPTION_KEY = os.getenv('CHAPA_ENCRIPTION_KEY', '')
+CHAPA_ENCRYPTION_KEY = os.getenv('CHAPA_ENCRYPTION_KEY', '') or os.getenv('CHAPA_ENCRIPTION_KEY', '')
 
 # Firebase Settings
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
@@ -289,7 +292,15 @@ except ImportError:
         }
     }
 
-# Logging Configuration
+# Logging: console always; file only when LOG_TO_FILE=true (e.g. local dev). On Render, use console only.
+_log_to_file = os.getenv('LOG_TO_FILE', 'false').lower() == 'true'
+_handlers_root = ['console']
+if _log_to_file:
+    logs_dir = BASE_DIR / 'logs'
+    if not logs_dir.exists():
+        os.makedirs(logs_dir, exist_ok=True)
+    _handlers_root.append('file')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -313,32 +324,27 @@ LOGGING = {
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': _handlers_root,
         'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': _handlers_root,
             'level': 'INFO',
             'propagate': False,
         },
         'payments': {
-            'handlers': ['console', 'file'],
+            'handlers': _handlers_root,
             'level': 'INFO',
             'propagate': False,
         },
         'accounts': {
-            'handlers': ['console', 'file'],
+            'handlers': _handlers_root,
             'level': 'INFO',
             'propagate': False,
         },
     },
 }
-
-# Create logs directory if it doesn't exist
-logs_dir = BASE_DIR / 'logs'
-if not logs_dir.exists():
-    os.makedirs(logs_dir, exist_ok=True)
 
 # Celery (optional): pip install celery django-celery-beat redis
 # Run: celery -A config worker -l info && celery -A config beat -l info
