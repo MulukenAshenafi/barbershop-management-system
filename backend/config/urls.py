@@ -4,9 +4,21 @@ URL configuration for barbershop management system.
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
 
+
+def root_view(request):
+    """Root URL: point users to the API."""
+    return JsonResponse({
+        "message": "Barbershop Management System API",
+        "docs": "/api/docs/",
+        "admin": "/admin/",
+    })
+
+
 urlpatterns = [
+    path('', root_view),
     path('admin/', admin.site.urls),
     path('api/barbershops/', include('barbershops.urls')),
     path('api/reviews/', include('barbershops.review_urls')),
