@@ -5,19 +5,20 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['email', 'name', 'role', 'phone', 'is_active', 'date_joined']
+    list_display = ['uuid', 'email', 'name', 'role', 'phone_number', 'phone', 'is_active', 'date_joined']
     list_filter = ['role', 'is_active', 'is_staff', 'date_joined']
-    search_fields = ['email', 'name', 'phone']
+    search_fields = ['email', 'name', 'phone', 'phone_number', 'firebase_uid']
     ordering = ['-date_joined']
-    
+    readonly_fields = ['uuid', 'date_joined', 'updated_at']
+
     fieldsets = (
-        (None, {'fields': ('email', 'password')}),
-        ('Personal info', {'fields': ('name', 'phone', 'location', 'profile_pic_url', 'profile_pic_public_id')}),
+        (None, {'fields': ('uuid', 'email', 'password')}),
+        ('Personal info', {'fields': ('name', 'phone', 'phone_number', 'location', 'profile_pic_url', 'profile_pic_public_id')}),
         ('Role & Permissions', {'fields': ('role', 'preferences', 'specialization', 'is_active', 'is_staff', 'is_superuser')}),
         ('Firebase', {'fields': ('firebase_uid', 'firebase_provider')}),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+        ('Important dates', {'fields': ('last_login', 'date_joined', 'updated_at')}),
     )
-    
+
     add_fieldsets = (
         (None, {
             'classes': ('wide',),

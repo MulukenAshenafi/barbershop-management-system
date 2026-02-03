@@ -14,7 +14,8 @@ import { NotificationBadge } from '../../components/common/NotificationBadge';
 import { OptimizedImage } from '../../components/common/OptimizedImage';
 import { AntDesign } from '@expo/vector-icons';
 import { loadUserData, UserData } from '../../data/UserData';
-import { clearAuth, updateStoredUser } from '../../services/auth';
+import { updateStoredUser } from '../../services/auth';
+import { logout } from '../../services/authService';
 import NotificationService from '../../services/notifications';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -246,8 +247,8 @@ const Account = ({ navigation, route }) => {
             style={[styles.menuRow, styles.logoutRow]}
             onPress={async () => {
               await NotificationService.unregister();
-              await clearAuth();
-              navigation.reset({ index: 0, routes: [{ name: 'login' }] });
+              await logout();
+              navigation.reset({ index: 0, routes: [{ name: 'welcome' }] });
             }}
             activeOpacity={0.8}
           >

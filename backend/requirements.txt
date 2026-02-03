@@ -11,6 +11,8 @@ Pillow==10.1.0
 requests==2.31.0
 # Firebase Admin SDK
 firebase-admin==6.5.0
+# Google OAuth id_token verification (for "Continue with Google")
+google-auth==2.27.0
 # API Documentation
 drf-spectacular==0.27.1
 # CamelCase JSON for frontend compatibility

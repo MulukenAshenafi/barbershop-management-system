@@ -21,17 +21,17 @@ import { fontSizes, spacing, borderRadius, typography } from '../../theme';
 
 const barberBookLogo = require('../../assets/Logo — BarberBook Brand.jpeg');
 
-const Login = ({ navigation }) => {
+const Login = ({ navigation, route }) => {
   const { colors } = useTheme();
   const toast = useToast();
   const { checkAuth } = useAuth();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState(route?.params?.email ?? '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
-    const { success, error } = await loginWithEmail(username, password);
+    const { success, error } = await loginWithEmail(email, password);
     setLoading(false);
     if (success) {
       toast.show('Login successful', { type: 'success' });
@@ -61,10 +61,12 @@ const Login = ({ navigation }) => {
 
         <Card style={styles.card}>
           <InputBox
-            placeholder="Username"
-            value={username}
-            setValue={setUsername}
-            autoComplete="username"
+            placeholder="Email"
+            value={email}
+            setValue={setEmail}
+            autoComplete="email"
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
           <InputBox
             placeholder="Password"

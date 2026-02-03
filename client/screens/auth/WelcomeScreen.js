@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/common/Button';
 import config from '../../config';
 import { isAuthenticated } from '../../services/auth';
-import { exchangeGoogleToken, loginWithApple } from '../../services/authService';
+import { exchangeGoogleToken, loginWithApple, isFirebaseConfigured } from '../../services/authService';
 import { useTheme } from '../../context/ThemeContext';
 import {
   fontSizes,
@@ -103,12 +103,12 @@ export default function WelcomeScreen() {
     else Alert.alert('Apple Sign-In', error || 'Sign-in failed');
   };
 
-  const handleEmail = () => {
-    navigation.navigate('login');
+  const handleSignIn = () => {
+    navigation.navigate('email-sign-in');
   };
 
-  const handleLoginLink = () => {
-    navigation.navigate('login');
+  const handleCreateAccount = () => {
+    navigation.navigate('register');
   };
 
   return (
@@ -118,6 +118,9 @@ export default function WelcomeScreen() {
         <Text style={[styles.headline, { color: colors.text }]}>Book your cut.{'\n'}No hassle.</Text>
         <Text style={[styles.subhead, { color: colors.textSecondary }]}>
           BarberBook — find barbershops, book appointments, and shop products in one app.
+        </Text>
+        <Text style={[styles.barbershopHint, { color: colors.textSecondary }]}>
+          Barbershop owners: sign in or create an account to list your shop and manage bookings from your account.
         </Text>
 
         <View style={styles.ctas}>
@@ -160,25 +163,32 @@ export default function WelcomeScreen() {
           )}
 
           <Button
-            title="Continue with Email"
-            onPress={handleEmail}
+            title="Sign in with Email"
+            onPress={handleSignIn}
             variant="primary"
             fullWidth
             style={styles.emailBtn}
             disabled={!!loading}
           />
+          {isFirebaseConfigured() && (
+            <TouchableOpacity
+              style={[styles.socialBtn, { backgroundColor: colors.card, borderColor: colors.gray200 }]}
+              onPress={() => navigation.navigate('phone-login')}
+              disabled={!!loading}
+              activeOpacity={0.9}
+            >
+              <Text style={[styles.socialBtnText, { color: colors.text }]}>Sign in with phone</Text>
+            </TouchableOpacity>
+          )}
+          <Button
+            title="Create account"
+            onPress={handleCreateAccount}
+            variant="outline"
+            fullWidth
+            style={styles.emailBtn}
+            disabled={!!loading}
+          />
         </View>
-
-        <TouchableOpacity
-          style={styles.loginLink}
-          onPress={handleLoginLink}
-          disabled={!!loading}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={[styles.loginLinkText, { color: colors.textSecondary }]}>
-            Already have an account? <Text style={[styles.loginLinkBold, { color: colors.secondary }]}>Log in</Text>
-          </Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -202,8 +212,14 @@ const styles = StyleSheet.create({
   },
   subhead: {
     ...typography.bodySmall,
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.md,
     lineHeight: 22,
+  },
+  barbershopHint: {
+    ...typography.caption,
+    marginBottom: spacing.xxl,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
   ctas: {
     gap: spacing.md,
@@ -230,16 +246,5 @@ const styles = StyleSheet.create({
   appleBtnText: {},
   emailBtn: {
     marginTop: spacing.xs,
-  },
-  loginLink: {
-    marginTop: spacing.xl,
-    alignSelf: 'center',
-    paddingVertical: spacing.sm,
-  },
-  loginLinkText: {
-    ...typography.bodySmall,
-  },
-  loginLinkBold: {
-    fontWeight: '600',
   },
 });

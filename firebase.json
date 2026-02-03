@@ -1,0 +1,9 @@
+{
+  "hosting": {
+    "public": "firebase-hosting/public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/email-signin", "destination": "/email-signin.html" }
+    ]
+  }
+}

@@ -26,6 +26,9 @@ import Payments from "./screens/Payments";
 import WelcomeScreen from "./screens/auth/WelcomeScreen";
 import Login from "./screens/auth/Login";
 import Register from "./screens/auth/Register";
+import PhoneLogin from "./screens/auth/PhoneLogin";
+import EmailSignInScreen from "./screens/auth/EmailSignInScreen";
+import EmailLinkHandler from "./components/auth/EmailLinkHandler";
 import Account from "./screens/Account/Account";
 import Notifications from "./screens/Account/Notifications";
 import NotificationPreferences from "./screens/Account/NotificationPreferences";
@@ -125,6 +128,7 @@ function EnrollmentAwareNavigator({ isAuth }) {
       <Stack.Screen name="welcome" component={WelcomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="login" component={Login} options={{ headerShown: false }} />
       <Stack.Screen name="register" component={Register} options={{ headerShown: false }} />
+      <Stack.Screen name="phone-login" component={PhoneLogin} options={{ headerShown: false }} />
       <Stack.Screen name="enrollment-gate" component={EnrollmentGateScreen} options={{ headerShown: false }} />
       <Stack.Screen name="barbershop-registration" component={BarbershopRegistrationScreen} options={{ title: "Register Barbershop" }} />
       <Stack.Screen name="join-barbershop" component={JoinBarbershopScreen} options={{ title: "Join Barbershop" }} />
@@ -283,6 +287,7 @@ export default function App() {
           <ThemeAwareStatusBar />
           <CartProvider>
             <AuthProvider>
+            <EmailLinkHandler />
             <AuthGate>
               {(isAuth) => (
                 <BarbershopProvider>
@@ -305,8 +310,10 @@ export default function App() {
               ) : (
                 <Stack.Navigator initialRouteName="welcome">
                   <Stack.Screen name="welcome" component={WelcomeScreen} options={{ headerShown: false }} />
+                  <Stack.Screen name="email-sign-in" component={EmailSignInScreen} options={{ headerShown: false }} />
                   <Stack.Screen name="login" component={Login} options={{ headerShown: false }} />
                   <Stack.Screen name="register" component={Register} options={{ headerShown: false }} />
+                  <Stack.Screen name="phone-login" component={PhoneLogin} options={{ headerShown: false }} />
                   <Stack.Screen name="join-barbershop" component={JoinBarbershopScreen} options={{ title: "Join Barbershop" }} />
                   <Stack.Screen name="home" component={Home} options={{ headerShown: false }} />
                   <Stack.Screen name="ExploreShops" component={ExploreShopsScreen} options={{ title: "Explore Shops" }} />

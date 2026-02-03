@@ -20,6 +20,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import api, { getApiErrorMessage } from '../../services/api';
 import { setAuth } from '../../services/auth';
+import { signUpWithEmail, isFirebaseConfigured } from '../../services/authService';
 import { getFileForFormData } from '../../utils/imageUpload';
 import { fontSizes, spacing, borderRadius, typography } from '../../theme';
 
@@ -56,11 +57,29 @@ const Register = ({ navigation }) => {
   };
 
   const handleSignUp = async () => {
+    if (loading) return;
+    if (isFirebaseConfigured()) {
+      if (!email?.trim() || !password) {
+        toast.show('Please enter email and password', { type: 'error' });
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      const { success, error: errMsg } = await signUpWithEmail(email, password, name || undefined);
+      setLoading(false);
+      if (success) {
+        toast.show('Account created. Welcome!', { type: 'success' });
+        checkAuth();
+        navigation.reset({ index: 0, routes: [{ name: 'home' }] });
+      } else {
+        setError(errMsg || 'Sign up failed');
+      }
+      return;
+    }
     if (!name || !email || !password || !contact || !location) {
       toast.show('Please fill in all required fields', { type: 'error' });
       return;
     }
-    if (loading) return;
     setLoading(true);
     setError(null);
     try {

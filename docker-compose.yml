@@ -1,97 +1,66 @@
+# Production-style Docker Compose: Backend + PostgreSQL only.
+# All configuration via environment variables (no hardcoded secrets).
+# Suitable for local development and Render Docker deployment.
+
 services:
-  # PostgreSQL + PostGIS (for geo-search / barbershops near me)
   db:
     image: postgis/postgis:15-3.3-alpine
     container_name: bsbs_db
     environment:
-      POSTGRES_DB: ${DB_NAME:-barbershop_db}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "${DB_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
       - bsbs_network
 
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: bsbs_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - bsbs_network
-
-  # Django Backend
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: bsbs_backend
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS}
+      CLOUDINARY_NAME: ${CLOUDINARY_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_SECRET: ${CLOUDINARY_SECRET:-}
+      CHAPA_SECRET_KEY: ${CHAPA_SECRET_KEY:-}
+      CHAPA_PUBLIC_KEY: ${CHAPA_PUBLIC_KEY:-}
+      CHAPA_WEBHOOK_SECRET: ${CHAPA_WEBHOOK_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     volumes:
-      - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     ports:
       - "8000:8000"
-    env_file:
-      - ./.env
-    environment:
-      # Use same DB credentials as db service (from project root .env or defaults)
-      - DB_HOST=db
-      - DB_NAME=${DB_NAME:-barbershop_db}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - REDIS_URL=redis://redis:6379/1
     depends_on:
       db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - bsbs_network
     restart: unless-stopped
 
-  # React/Expo Client (Optional - for web development)
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: bsbs_client
-    volumes:
-      - ./client:/app
-      - /app/node_modules
-    ports:
-      - "19000:19000"
-      - "19001:19001"
-      - "19002:19002"
-    environment:
-      - EXPO_PUBLIC_API_URL=http://localhost:8000/api
-    depends_on:
-      - backend
-    networks:
-      - bsbs_network
-    profiles:
-      - client  # Only start with --profile client flag
-
 volumes:
   postgres_data:
-    driver: local
-  redis_data:
     driver: local
   static_volume:
     driver: local
