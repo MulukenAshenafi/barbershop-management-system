@@ -1,183 +1,155 @@
-# BarberBook – Barbershop Management System
+# BarberBook
 
-A full-stack barbershop booking platform: find shops, book services, buy products, and manage appointments. Branded as **BarberBook** in the client. Built for customers and shop owners with dark/light theme, Cloudinary image uploads, Chapa payments, and production-ready UX.
-
----
-
-## Value Proposition
-
-- **Customers:** Browse shops, book services, buy products, pay via Chapa, leave reviews, and manage appointments—all in one app with dark mode and consistent toasts.
-- **Owners:** Manage barbershops, staff, services, products, bookings, and payments from an admin dashboard with clear flows and error handling.
+A full-stack barbershop booking platform: find shops, book services, buy products, and manage appointments. Built for customers and shop owners, with Firebase auth, Cloudinary media, and Chapa payments.
 
 ---
 
-## Key Features
+## Project overview
 
-| Area | Features |
-|------|----------|
-| **Auth** | Email/password signup & login (with optional profile photo), JWT persistence, optional Firebase (Google/Apple), 401 handling with redirect to login |
-| **Booking** | Service selection, barber/slot picker, calendar, booking creation, my-appointments, cancellation |
-| **Cart & Payments** | Add services/products to cart, checkout, Chapa integration (booking & order payments), payment verification |
-| **Reviews** | Star ratings, rating breakdown, write review modal, review display on shop profile |
-| **Images** | Cloudinary uploads for profile pics, barbershop logos, services, products; consistent web/native upload and double-submit prevention |
-| **UX** | Dark/light theme (ThemeContext), app-wide toasts (ToastProvider), optimized images (Cloudinary), error boundaries, loading/skeleton states |
-| **Owner** | Dashboard, manage services/products/bookings/payments/staff, barbershop enrollment, staff invitations |
+**What it is:** BarberBook is a mobile-first (React Native/Expo) and web-capable app backed by a Django REST API. Customers browse barbershops, book services, add products to cart, pay via Chapa, and manage appointments. Owners manage shops, staff, services, products, bookings, and payments from an admin dashboard.
+
+**Problem it solves:** Centralizes discovery, booking, payments, and management for barbershops in one place, with a single API and shared auth (Firebase) and media (Cloudinary).
+
+**High-level architecture:** Client (Expo app) talks to the Django API over HTTPS. The API uses PostgreSQL as the system of record and Firebase for identity (email/password, phone OTP, Google/Apple). No secrets or credentials are hardcoded; everything is driven by environment variables.
 
 ---
 
-## Tech Stack
+## Tech stack
 
-| Layer | Technologies |
-|-------|--------------|
-| **Client** | React Native (Expo SDK 54), React Navigation, Axios, AsyncStorage, Expo Notifications, react-native-maps, react-native-calendars |
-| **Backend** | Django 4.2, Django REST Framework, PostgreSQL, Redis (cache), Gunicorn |
-| **Auth** | djangorestframework-simplejwt, Firebase Admin SDK (optional social login) |
-| **Storage** | Cloudinary (media), django-cloudinary-storage |
-| **Payments** | Chapa (webhook + verify flow) |
-| **API** | drf-spectacular (OpenAPI/Swagger), djangorestframework-camel-case (camelCase JSON) |
-| **Optional** | Celery + django-celery-beat (booking reminder pushes) |
+| Layer        | Technology |
+|-------------|------------|
+| **Backend** | Django 4.2, Django REST Framework, Gunicorn |
+| **Database**| PostgreSQL 15 (PostGIS), run in Docker with a named volume |
+| **Auth**    | Firebase (identity); Firebase Admin SDK (token verification); PostgreSQL (user/role store) |
+| **Media**   | Cloudinary (optional) |
+| **Payments**| Chapa (optional) |
+| **Deployment** | Docker, Docker Compose; Render (Docker services) |
+| **Client**  | React Native (Expo) – separate repo or local; consumes this API |
 
 ---
 
-## Project Structure
+## Architecture (textual)
 
 ```
-BSBS_UPDATED/
-├── backend/           # Django API (accounts, barbershops, services, bookings, payments, notifications)
-├── client/             # Expo (React Native) app
-│   ├── assets/         # App icon, splash, favicon, banners, fallback images
-│   ├── components/
-│   ├── context/
-│   ├── data/
-│   ├── screens/
-│   ├── services/
-│   ├── theme/
-│   └── utils/          # Shared helpers (e.g. imageUpload for Cloudinary)
-├── docker-compose.yml  # PostgreSQL, Redis, Django backend
-├── .env                # Not committed; copy from .env.example
-└── README.md
+┌─────────────────────┐
+│  Client             │  (Mobile/Web – Expo)
+│  (BarberBook app)   │
+└──────────┬──────────┘
+           │ HTTPS / REST
+           ▼
+┌─────────────────────┐
+│  Backend API        │  (Django in Docker)
+│  Gunicorn :8000     │
+└──────────┬──────────┘
+           │
+           ├──────────────────┐
+           ▼                  ▼
+┌─────────────────────┐  ┌─────────────────────┐
+│  PostgreSQL         │  │  Firebase Auth       │
+│  (Docker + volume)  │  │  (token verify)     │
+└─────────────────────┘  └─────────────────────┘
 ```
+
+- **Client** → **Backend**: All configuration via env (e.g. `EXPO_PUBLIC_API_URL`). No secrets in repo.
+- **Backend** → **PostgreSQL**: Uses Docker service name `db` and env vars `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
+- **Backend** → **Firebase**: Token verification and user sync via `FIREBASE_PROJECT_ID` and `FIREBASE_CREDENTIALS`.
 
 ---
 
-## How to Run Locally
+## Local development
 
 ### Prerequisites
 
-- **Docker:** Docker Desktop or Docker Engine + Docker Compose  
-- **Or manual:** Python 3.10+, Node 18+, PostgreSQL 12+, Redis (optional)
+- Docker and Docker Compose
+- (Optional) Python 3.10+, Node 18+ if running backend or client without Docker
 
-### 1. Clone and enter project
+### Run with Docker Compose
 
-```bash
-git clone <repo-url>
-cd BSBS_UPDATED
-```
+1. **Clone and enter the repo**
+   ```bash
+   git clone <repo-url>
+   cd BSBS_UPDATED
+   ```
 
-### 2. Environment
+2. **Environment**
+   - Copy the root `.env.example` to `.env` in the same directory (project root).
+   - Set at least: `SECRET_KEY`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.  
+   - For production-like local run: `DEBUG=False`, `ALLOWED_HOSTS=localhost,127.0.0.1`.
 
-- Copy root **`.env.example`** to **`.env`** at the **project root** (same folder as `docker-compose.yml`).
-- Set at least: `SECRET_KEY`, `DEBUG`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
-- Optionally: `DB_HOST`, `DB_PORT`, `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET`, `CHAPA_*`, `FIREBASE_*`, `REDIS_URL`.
+3. **Start services**
+   ```bash
+   docker compose up --build
+   ```
+   - **API:** http://localhost:8000  
+   - **Admin:** http://localhost:8000/admin/  
+   - **Swagger:** http://localhost:8000/api/docs/
 
-### 3. Run backend with Docker (recommended)
+4. **Create a superuser (first time)**
+   ```bash
+   docker compose exec backend python manage.py createsuperuser
+   ```
 
-```bash
-docker compose up --build
-```
-
-In another terminal, create an admin user:
-
-```bash
-docker compose exec backend python manage.py createsuperuser
-```
-
-- **API:** http://localhost:8000  
-- **Admin:** http://localhost:8000/admin/  
-- **Swagger:** http://localhost:8000/api/docs/
-
-### 4. Run the client
-
-```bash
-cd client
-cp .env.example .env   # optional: set EXPO_PUBLIC_API_URL for device testing
-npm install
-npm start
-```
-
-Then use Expo Go (scan QR), or press **w** for web at http://localhost:8081, or `npm run android` / `npm run ios`.
-
-### Manual backend (no Docker)
-
-```bash
-cd backend
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
-
-Client: in `client/`, set API base URL in `config.js` (or `.env` with `EXPO_PUBLIC_API_URL`), then `npm install` and `npm start`.
+5. **Run the client (optional, from another terminal)**
+   ```bash
+   cd client
+   cp .env.example .env   # set EXPO_PUBLIC_API_URL to http://<your-ip>:8000/api for device
+   npm install
+   npm start
+   ```
 
 ---
 
-## Environment Variables
+## Deployment (Render)
 
-**Root `.env` (backend / Docker):**
+The project is designed to be deployed on **Render** using **Docker** (and optionally Docker Compose).
 
-- `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
-- `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET` — for profile pics, logos, services, products
-- `CHAPA_SECRET_KEY`, `CHAPA_PUBLIC_KEY`, `CHAPA_WEBHOOK_SECRET`
-- `FIREBASE_*` (if using Firebase auth)
-- `REDIS_URL` (optional)
+- **Backend:** Deploy as a **Web Service** with Docker. Use the same `Dockerfile` and build context as in this repo (e.g. build from `./backend`).
+- **PostgreSQL:** For this portfolio/demo, **PostgreSQL is run inside Docker** (as in `docker-compose.yml`), not as Render’s managed Postgres. On Render you can either:
+  - Use a **Blueprint** with Docker Compose so both the backend and the Postgres container run, or  
+  - Run a single Dockerfile that is not used with Compose (e.g. only the backend), and attach a **Render-managed Postgres** instance and set `DB_*` to point to it.
 
-**Client (optional `.env`):**
+**Free-tier limitations (transparent):**  
+- Render free tier may spin down services after inactivity; cold starts can add latency.  
+- Using containerized Postgres (as in this repo) avoids managed DB cost but data is ephemeral unless you attach a persistent disk or use an external DB.  
+- For a production app you would typically use Render (or another provider) managed PostgreSQL and keep the backend Dockerized.
 
-- `EXPO_PUBLIC_API_URL` — API base URL (no trailing slash); use LAN IP when testing on a physical device.
-- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` — for Google sign-in.
-- `EXPO_PUBLIC_FORCE_WELCOME` — set to `true` to always show welcome screen (e.g. for demos).
-
-**Never commit real secrets.** `.env` is in `.gitignore`.
+Configuration on Render is done **only via the Environment tab**; do not commit `.env` or any real secrets.
 
 ---
 
-## Screens & Flows
+## Environment variables
 
-**Customer:** Welcome → Login/Register → Home → Explore shops / Services / Products → Book service (slot selection) → Cart → Checkout → Payments (Chapa) → Confirmation; Account (profile, my appointments, my orders, notifications); Shop public profile & reviews.
+Set these in `.env` locally or in Render’s Environment UI. **No values below are real secrets; do not commit actual credentials.**
 
-**Owner / Admin:** Dashboard → Manage Services, Products, Bookings, Payments, Barbers; Staff enrollment (invite, join barbershop); barbershop registration and preferences.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DB_NAME` | Yes | PostgreSQL database name |
+| `DB_USER` | Yes | PostgreSQL user |
+| `DB_PASSWORD` | Yes | PostgreSQL password |
+| `DB_HOST` | In Docker | Set to `db` (service name); Compose sets this for the backend |
+| `DB_PORT` | No | Default `5432` |
+| `SECRET_KEY` | Yes | Django secret key (generate a new one for production) |
+| `DEBUG` | No | Set to `False` in production |
+| `ALLOWED_HOSTS` | Production | Comma-separated hosts, e.g. `your-app.onrender.com` |
+| `CORS_ALLOWED_ORIGINS` | If needed | Comma-separated frontend origins |
+| `FIREBASE_PROJECT_ID` | If using Firebase | Firebase project ID |
+| `FIREBASE_CREDENTIALS` | If using Firebase | Path to service account JSON or inline JSON string (never commit real file) |
+| `GOOGLE_CLIENT_ID` | Optional | For “Continue with Google” |
+| `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET` | Optional | Image uploads |
+| `CHAPA_*` | Optional | Payment gateway |
+| `REDIS_URL` | Optional | Caching (if not set, in-memory cache is used) |
 
----
-
-## Preparing for Git Push
-
-Before pushing to a remote repository:
-
-1. **Do not commit secrets.** Ensure `.env` is listed in `.gitignore` (it is by default). Never commit API keys, `SECRET_KEY`, or database passwords.
-2. **Use `.env.example` as a template.** Commit `.env.example` with placeholder values; teammates copy it to `.env` and fill in real values locally.
-3. **Check ignored paths.** The repo ignores `node_modules/`, `venv/`, `__pycache__/`, `.expo/`, `web-build/`, and other build/cache artifacts.
-4. **Optional: pre-push checks.** Run tests or lint if you have them (e.g. `cd backend && python manage.py check`, `cd client && npm run lint` if configured).
-
-Example first push:
-
-```bash
-git add .
-git status   # confirm no .env or sensitive files
-git commit -m "Initial commit: BarberBook full-stack app"
-git remote add origin <your-remote-url>
-git push -u origin main
-```
+See **`.env.example`** at the project root for the full list and short comments.
 
 ---
 
-## Production Notes
+## Portfolio note
 
-- **Error handling:** API client centralizes error messages; ErrorBoundary and toasts for user feedback.
-- **Theming:** ThemeContext (light/dark); StatusBar and navigation follow theme.
-- **Images:** Cloudinary for uploads; shared `getFileForFormData` in `client/utils/imageUpload.js` for web/native consistency; submit buttons use loading/disabled to prevent double uploads.
-- **API:** OpenAPI at `/api/docs/`, camelCase responses, CORS configured; Chapa webhook and verify for payments.
-- **Deploy:** Set `DEBUG=False`, configure `ALLOWED_HOSTS` and production DB/Redis; build mobile with Expo EAS or `expo build`.
+This repository is a **portfolio/demo project**.  
+
+- **PostgreSQL is run in Docker** (with a named volume for `/var/lib/postgresql/data`) to keep the stack self-contained and to avoid depending on a paid managed database on the free tier.  
+- For a real production deployment, you would typically switch to a managed PostgreSQL service and keep the backend Dockerized; the same environment variables (`DB_*`) are used.  
+- No secrets, API keys, or credentials are committed; the repo is intended to be safe to make public.
 
 ---
 

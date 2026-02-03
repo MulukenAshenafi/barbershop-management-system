@@ -22,7 +22,9 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']  # Update for production
+# Comma-separated list; default allows all when DEBUG=True (set explicitly in production)
+_allowed = os.getenv('ALLOWED_HOSTS', '').strip()
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] if _allowed else ['*']
 
 
 # Application definition
@@ -151,8 +153,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
 
 # REST Framework Configuration
+# Firebase ID token is primary; JWT kept for legacy/admin if needed.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'accounts.authentication.FirebaseAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -209,15 +213,15 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:19006",  # Expo default
-    "http://localhost:8081",   # Metro web (expo start → press w)
-    "http://127.0.0.1:8081",
-]
-
+# CORS: comma-separated origins from env; default localhost for dev
+_cors = os.getenv('CORS_ALLOWED_ORIGINS', '').strip()
+if _cors:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors.split(',') if o.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:19006", "http://localhost:8081", "http://127.0.0.1:8081",
+    ]
 CORS_ALLOW_CREDENTIALS = True
 
 # Cloudinary Settings
@@ -239,6 +243,9 @@ CHAPA_ENCRYPTION_KEY = os.getenv('CHAPA_ENCRIPTION_KEY', '')
 # Firebase Settings
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
 FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', '')
+
+# Google OAuth (for "Continue with Google" – use same client ID as Expo EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 
 # API Documentation (Swagger/OpenAPI)
 SPECTACULAR_SETTINGS = {

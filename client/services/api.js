@@ -1,14 +1,11 @@
 /**
- * API client with auth header, X-Barbershop-Id (tenant), and 401 handling.
- * Call setActiveBarbershopIdForApi(id) from BarbershopContext so requests include tenant header.
- *
- * Centralized error handling:
- * - getApiErrorMessage(err) – use for consistent user-facing messages.
- * - 401: handler is called with optional message ('Session expired'); clear storage then redirect.
+ * API client: Authorization Bearer (Firebase ID token or legacy JWT), X-Barbershop-Id, 401 handling.
+ * When Firebase auth is used, ID token is obtained from Firebase SDK (auto-refresh).
  */
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../config';
+import { FIREBASE_AUTH_FLAG } from './auth';
 
 let unauthorizedHandler = null;
 let subscriptionExpiredHandler = null;
@@ -39,9 +36,21 @@ const api = axios.create({
 api.interceptors.request.use(
   async (req) => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        req.headers.Authorization = `Bearer ${token}`;
+      const firebaseMode = await AsyncStorage.getItem(FIREBASE_AUTH_FLAG);
+      if (firebaseMode) {
+        try {
+          const { getFirebaseAuth } = require('./firebase');
+          const auth = getFirebaseAuth();
+          const user = auth?.currentUser;
+          if (user) {
+            const idToken = await user.getIdToken(false);
+            if (idToken) req.headers.Authorization = `Bearer ${idToken}`;
+          }
+        } catch (_) {}
+      }
+      if (!req.headers.Authorization) {
+        const token = await AsyncStorage.getItem('token');
+        if (token) req.headers.Authorization = `Bearer ${token}`;
       }
       if (activeBarbershopIdForApi) {
         req.headers['X-Barbershop-Id'] = activeBarbershopIdForApi;
@@ -60,18 +69,22 @@ api.interceptors.response.use(
     const original = err.config;
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true;
-      try {
-        await AsyncStorage.multiRemove([
-          'token',
-          'refreshToken',
-          'customerData',
-          'active_barbershop_id',
-        ]);
-      } catch (e) {
-        // ignore
+      const hadAuthHeader = !!original.headers?.Authorization;
+      if (hadAuthHeader) {
+        try {
+          await AsyncStorage.multiRemove([
+            'token',
+            'refreshToken',
+            'customerData',
+            FIREBASE_AUTH_FLAG,
+            'active_barbershop_id',
+          ]);
+        } catch (e) {
+          // ignore
+        }
       }
       if (typeof unauthorizedHandler === 'function') {
-        unauthorizedHandler('Session expired');
+        unauthorizedHandler(hadAuthHeader ? 'Session expired' : null);
       }
     }
     if (err.response?.status === 403 && err.response?.data?.detail === 'Subscription expired') {

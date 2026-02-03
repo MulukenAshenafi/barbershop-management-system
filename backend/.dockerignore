@@ -44,9 +44,10 @@ htmlcov/
 *.swo
 *~
 
-# Environment
+# Environment and secrets
 .env
 .env.local
+firebase/*.json
 
 # Git
 .git/

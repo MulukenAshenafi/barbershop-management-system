@@ -9,6 +9,7 @@ from .serializers import (
 )
 from .permissions import IsAdminUser
 from .firebase_auth import verify_firebase_token, get_or_create_user_from_firebase
+from .google_auth import verify_google_id_token, get_or_create_user_from_google
 import logging
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ class UserViewSet(viewsets.ModelViewSet):
             'success': True,
             'message': 'Customer registered successfully.',
             'user': {
-                'id': str(user.id),
+                'id': str(user.uuid),
                 'name': user.name,
                 'email': user.email,
                 'role': user.role,
@@ -119,7 +120,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 'success': True,
                 'message': 'Login successful.',
                 'user': {
-                    'id': str(user.id),
+                    'id': str(user.uuid),
                     'name': user.name,
                     'email': user.email,
                     'role': user.role,
@@ -265,59 +266,85 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def firebase_login(self, request):
-        """Firebase social login endpoint."""
+        """
+        Verify Firebase ID token and return backend user. Client uses Firebase ID token
+        for subsequent requests (Authorization: Bearer <id_token>). No Django JWT issued.
+        """
         id_token = request.data.get('id_token')
-        
         if not id_token:
             return Response({
                 'success': False,
-                'message': 'Firebase ID token is required'
+                'message': 'Firebase ID token is required',
             }, status=status.HTTP_400_BAD_REQUEST)
-        
         try:
-            # Verify Firebase token
             firebase_token = verify_firebase_token(id_token)
-            
-            # Get or create user from Firebase
             user = get_or_create_user_from_firebase(firebase_token)
-            
-            # Generate JWT token
-            token = RefreshToken.for_user(user)
-            
-            response = Response({
+            return Response({
                 'success': True,
                 'message': 'Firebase login successful.',
                 'user': {
-                    'id': str(user.id),
+                    'id': str(user.uuid),
+                    'name': user.name,
+                    'email': user.email or '',
+                    'role': user.role,
+                    'phone': user.phone or user.phone_number or '',
+                    'phoneNumber': user.phone_number or '',
+                    'profilePic': user.profile_pic,
+                    'location': user.location or '',
+                    'preferences': user.preferences or '',
+                    'specialization': user.specialization or '',
+                },
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error("Firebase login error: %s", str(e), exc_info=True)
+            return Response({
+                'success': False,
+                'message': str(e) or 'Firebase authentication failed',
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='social/google')
+    def google_login(self, request):
+        """Google OAuth login: accepts id_token from client, verifies and returns JWT."""
+        id_token_str = request.data.get('id_token')
+        if not id_token_str:
+            return Response({
+                'success': False,
+                'message': 'id_token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            payload = verify_google_id_token(id_token_str)
+            user = get_or_create_user_from_google(payload)
+            token = RefreshToken.for_user(user)
+            response = Response({
+                'success': True,
+                'message': 'Google login successful.',
+                'user': {
+                    'id': str(user.uuid),
                     'name': user.name,
                     'email': user.email,
                     'role': user.role,
-                    'phone': user.phone,
+                    'phone': user.phone or '',
                     'profilePic': user.profile_pic,
-                    'location': user.location,
-                    'preferences': user.preferences,
-                    'specialization': user.specialization,
+                    'location': user.location or '',
+                    'preferences': user.preferences or '',
+                    'specialization': user.specialization or '',
                 },
                 'token': str(token.access_token),
             }, status=status.HTTP_200_OK)
-            
-            # Set HTTP-only cookie
             response.set_cookie(
                 'token',
                 str(token.access_token),
-                max_age=15 * 24 * 60 * 60,  # 15 days
+                max_age=15 * 24 * 60 * 60,
                 httponly=True,
                 samesite='Strict',
-                secure=not request.get_host().startswith('localhost')
+                secure=not request.get_host().startswith('localhost'),
             )
-            
             return response
-            
         except Exception as e:
-            logger.error(f"Firebase login error: {str(e)}", exc_info=True)
+            logger.warning("Google login error: %s", str(e))
             return Response({
                 'success': False,
-                'message': f'Firebase authentication failed: {str(e)}'
+                'message': str(e) or 'Google authentication failed'
             }, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -332,7 +359,7 @@ def create_barber(request):
             'success': True,
             'message': 'Barber registered successfully.',
             'user': {
-                'id': str(user.id),
+                'id': str(user.uuid),
                 'name': user.name,
                 'email': user.email,
                 'role': user.role,
