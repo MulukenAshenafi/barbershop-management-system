@@ -1,6 +1,11 @@
-# Production-style Docker Compose: Backend + PostgreSQL only.
-# All configuration via environment variables (no hardcoded secrets).
-# Suitable for local development and Render Docker deployment.
+# =============================================================================
+# LOCAL DEVELOPMENT ONLY – Backend + PostgreSQL (Docker)
+# =============================================================================
+# Use this for local dev: `docker compose up --build`
+# For Render: deploy the backend as a Web Service (Dockerfile in backend/);
+# use Render's free-tier PostgreSQL and set DB_* env vars – do NOT use this
+# Compose file on Render.
+# =============================================================================
 
 services:
   db:
@@ -47,6 +52,8 @@ services:
       CHAPA_PUBLIC_KEY: ${CHAPA_PUBLIC_KEY:-}
       CHAPA_WEBHOOK_SECRET: ${CHAPA_WEBHOOK_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    # Local dev only: persist static/media in named volumes. On Render, no volumes;
+    # static served by WhiteNoise, media by Cloudinary or S3.
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media

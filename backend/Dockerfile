@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy project
 COPY . /app/
 
-# Fix CRLF and install entrypoint outside /app so it is NOT overwritten by volume mount (./backend:/app)
+# Entrypoint runs from / so it is not overwritten by local dev volume mounts (when used with Compose)
 RUN sed -i 's/\r$//' /app/entrypoint.sh 2>/dev/null || true && \
     cp /app/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
 
@@ -40,5 +40,5 @@ EXPOSE 8000
 # Run entrypoint from / so it stays LF; /app is overwritten by volume on host
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
-# Default command (can be overridden in docker-compose)
+# Production: run with env from Render (DB_*, SECRET_KEY, etc.). No Compose required.
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]

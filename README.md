@@ -1,6 +1,6 @@
 # BarberBook
 
-A full-stack barbershop booking platform: find shops, book services, buy products, and manage appointments. Built for customers and shop owners, with Firebase auth, Cloudinary media, and Chapa payments.
+A full-stack barbershop booking platform: find shops, book services, buy products, and manage appointments. Built for customers and shop owners, with Firebase auth, optional Cloudinary media, and Chapa payments.
 
 ---
 
@@ -8,9 +8,9 @@ A full-stack barbershop booking platform: find shops, book services, buy product
 
 **What it is:** BarberBook is a mobile-first (React Native/Expo) and web-capable app backed by a Django REST API. Customers browse barbershops, book services, add products to cart, pay via Chapa, and manage appointments. Owners manage shops, staff, services, products, bookings, and payments from an admin dashboard.
 
-**Problem it solves:** Centralizes discovery, booking, payments, and management for barbershops in one place, with a single API and shared auth (Firebase) and media (Cloudinary).
+**Problem it solves:** Centralizes discovery, booking, payments, and management for barbershops in one place, with a single API and shared auth (Firebase) and optional media (Cloudinary).
 
-**High-level architecture:** Client (Expo app) talks to the Django API over HTTPS. The API uses PostgreSQL as the system of record and Firebase for identity (email/password, phone OTP, Google/Apple). No secrets or credentials are hardcoded; everything is driven by environment variables.
+**Secrets:** No secrets or credentials are hardcoded. Database, CORS, allowed hosts, Firebase, Chapa, and Cloudinary are driven entirely by environment variables.
 
 ---
 
@@ -18,41 +18,42 @@ A full-stack barbershop booking platform: find shops, book services, buy product
 
 | Layer        | Technology |
 |-------------|------------|
-| **Backend** | Django 4.2, Django REST Framework, Gunicorn |
-| **Database**| PostgreSQL 15 (PostGIS), run in Docker with a named volume |
+| **Backend** | Django 4.2, Django REST Framework, Gunicorn, WhiteNoise |
+| **Database**| PostgreSQL (PostGIS optional); locally via Docker, on Render via Render PostgreSQL |
 | **Auth**    | Firebase (identity); Firebase Admin SDK (token verification); PostgreSQL (user/role store) |
-| **Media**   | Cloudinary (optional) |
+| **Media**   | Cloudinary (optional) or local files; production can use S3 instead |
 | **Payments**| Chapa (optional) |
-| **Deployment** | Docker, Docker Compose; Render (Docker services) |
-| **Client**  | React Native (Expo) – separate repo or local; consumes this API |
+| **Deployment** | Local: Docker Compose. Production: Render (Docker + Render free-tier PostgreSQL) |
+| **Client**  | React Native (Expo) – separate or in `client/`; consumes this API |
 
 ---
 
-## Architecture (textual)
+## Architecture
 
 ```
-┌─────────────────────┐
-│  Client             │  (Mobile/Web – Expo)
-│  (BarberBook app)   │
-└──────────┬──────────┘
-           │ HTTPS / REST
-           ▼
-┌─────────────────────┐
-│  Backend API        │  (Django in Docker)
-│  Gunicorn :8000     │
-└──────────┬──────────┘
-           │
-           ├──────────────────┐
-           ▼                  ▼
-┌─────────────────────┐  ┌─────────────────────┐
-│  PostgreSQL         │  │  Firebase Auth       │
-│  (Docker + volume)  │  │  (token verify)     │
-└─────────────────────┘  └─────────────────────┘
+                    ┌─────────────────────────────────────┐
+                    │  Client (React Native / Expo)       │
+                    │  Mobile & Web                       │
+                    └─────────────────┬───────────────────┘
+                                      │ HTTPS / REST
+                                      ▼
+                    ┌─────────────────────────────────────┐
+                    │  Backend API (Django + Gunicorn)    │
+                    │  :8000 | WhiteNoise static          │
+                    └─────┬───────────────────┬───────────┘
+                          │                   │
+          ┌───────────────┘                   └───────────────┐
+          ▼                                                   ▼
+┌─────────────────────┐                         ┌─────────────────────┐
+│  PostgreSQL         │                         │  Firebase Auth       │
+│  Local: Docker `db` │                         │  Token verification  │
+│  Render: Render PG  │                         │  & user sync         │
+└─────────────────────┘                         └─────────────────────┘
 ```
 
-- **Client** → **Backend**: All configuration via env (e.g. `EXPO_PUBLIC_API_URL`). No secrets in repo.
-- **Backend** → **PostgreSQL**: Uses Docker service name `db` and env vars `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
-- **Backend** → **Firebase**: Token verification and user sync via `FIREBASE_PROJECT_ID` and `FIREBASE_CREDENTIALS`.
+- **Client → Backend:** Configure via env (e.g. `EXPO_PUBLIC_API_URL`). No secrets in repo.
+- **Backend → PostgreSQL:** Uses `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Local Docker: `DB_HOST=db`. Render: set from Render PostgreSQL.
+- **Backend → Firebase:** `FIREBASE_PROJECT_ID`, `FIREBASE_CREDENTIALS` (path or inline JSON).
 
 ---
 
@@ -72,9 +73,10 @@ A full-stack barbershop booking platform: find shops, book services, buy product
    ```
 
 2. **Environment**
-   - Copy the root `.env.example` to `.env` in the same directory (project root).
-   - Set at least: `SECRET_KEY`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.  
-   - For production-like local run: `DEBUG=False`, `ALLOWED_HOSTS=localhost,127.0.0.1`.
+   - Copy the root `.env.example` to `.env` in the project root.
+   - Set at least: `SECRET_KEY`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+   - For local dev, `DB_HOST` is set by Compose to `db`; you can leave it in `.env` as `db`.
+   - Optional: `DEBUG=True`, `ALLOWED_HOSTS=localhost,127.0.0.1`, `LOG_TO_FILE=true`.
 
 3. **Start services**
    ```bash
@@ -89,7 +91,7 @@ A full-stack barbershop booking platform: find shops, book services, buy product
    docker compose exec backend python manage.py createsuperuser
    ```
 
-5. **Run the client (optional, from another terminal)**
+5. **Run the client (optional)**
    ```bash
    cd client
    cp .env.example .env   # set EXPO_PUBLIC_API_URL to http://<your-ip>:8000/api for device
@@ -99,57 +101,100 @@ A full-stack barbershop booking platform: find shops, book services, buy product
 
 ---
 
-## Deployment (Render)
+## Render deployment
 
-The project is designed to be deployed on **Render** using **Docker** (and optionally Docker Compose).
+The backend runs on Render as a **Web Service** using the **Dockerfile** in `backend/`. It does **not** use Docker Compose on Render; it connects to **Render’s free-tier PostgreSQL** via environment variables.
 
-- **Backend:** Deploy as a **Web Service** with Docker. Use the same `Dockerfile` and build context as in this repo (e.g. build from `./backend`).
-- **PostgreSQL:** For this portfolio/demo, **PostgreSQL is run inside Docker** (as in `docker-compose.yml`), not as Render’s managed Postgres. On Render you can either:
-  - Use a **Blueprint** with Docker Compose so both the backend and the Postgres container run, or  
-  - Run a single Dockerfile that is not used with Compose (e.g. only the backend), and attach a **Render-managed Postgres** instance and set `DB_*` to point to it.
+### 1. Create a PostgreSQL database on Render
 
-**Free-tier limitations (transparent):**  
-- Render free tier may spin down services after inactivity; cold starts can add latency.  
-- Using containerized Postgres (as in this repo) avoids managed DB cost but data is ephemeral unless you attach a persistent disk or use an external DB.  
-- For a production app you would typically use Render (or another provider) managed PostgreSQL and keep the backend Dockerized.
+1. In [Render Dashboard](https://dashboard.render.com/), click **New +** → **PostgreSQL**.
+2. Create a **Free** instance (e.g. name `barbershop-db`).
+3. After creation, open the database and note:
+   - **Internal Database URL** (use this for env vars, or the individual fields below).
+   - Or use: **Host**, **Port**, **Database**, **User**, **Password**.
 
-Configuration on Render is done **only via the Environment tab**; do not commit `.env` or any real secrets.
+### 2. Create a Web Service (backend)
+
+1. **New +** → **Web Service**.
+2. Connect your repo and set:
+   - **Root Directory:** `backend` (so the build context is the backend folder).
+   - **Environment:** Docker.
+   - **Dockerfile Path:** `Dockerfile` (relative to Root Directory).
+
+3. **Environment variables** (set in the Render service **Environment** tab):
+
+   | Variable | Required | Example / notes |
+   |----------|----------|------------------|
+   | `DB_HOST` | Yes | From Render Postgres: **Internal Host** |
+   | `DB_PORT` | Yes | Usually `5432` |
+   | `DB_NAME` | Yes | Render Postgres database name |
+   | `DB_USER` | Yes | Render Postgres user |
+   | `DB_PASSWORD` | Yes | Render Postgres password |
+   | `SECRET_KEY` | Yes | New Django secret (e.g. `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`) |
+   | `DEBUG` | No | `False` |
+   | `ALLOWED_HOSTS` | Yes | `your-service-name.onrender.com` |
+   | `CORS_ALLOWED_ORIGINS` | If needed | `https://your-frontend.onrender.com,https://yourapp.com` |
+   | `FIREBASE_PROJECT_ID` | If using Firebase | Your project ID |
+   | `FIREBASE_CREDENTIALS` | If using Firebase | Inline JSON string of service account key (no file on Render) |
+   | `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET` | Optional | For media uploads |
+   | `CHAPA_*` | Optional | Payment gateway |
+
+   Do **not** commit `.env` or real secrets; set everything in Render’s UI.
+
+4. **Build & Deploy:** Render will build the Docker image from `backend/Dockerfile` and run:
+   ```bash
+   gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+   ```
+   The entrypoint will wait for the database, run migrations, collect static files, then start Gunicorn. Static files are served by WhiteNoise (no volume needed).
+
+### 3. After first deploy
+
+- Open **https://your-service-name.onrender.com/admin/** and create a superuser (use Render **Shell** or a one-off command if available):
+  ```bash
+  python manage.py createsuperuser
+  ```
 
 ---
 
-## Environment variables
+## Free-tier limitations (portfolio / demo)
 
-Set these in `.env` locally or in Render’s Environment UI. **No values below are real secrets; do not commit actual credentials.**
+- **Render free Web Service:** Spins down after inactivity; cold starts can add latency.
+- **Render free PostgreSQL:** Limited storage and connections; suitable for demos and portfolios.
+- **No persistent disk:** Backend container is ephemeral; use Render PostgreSQL for data and Cloudinary (or S3) for media in production.
+- For production traffic and data, consider paid plans and managed PostgreSQL.
+
+---
+
+## Environment variables reference
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DB_NAME` | Yes | PostgreSQL database name |
-| `DB_USER` | Yes | PostgreSQL user |
-| `DB_PASSWORD` | Yes | PostgreSQL password |
-| `DB_HOST` | In Docker | Set to `db` (service name); Compose sets this for the backend |
+| `DB_HOST` | Yes | PostgreSQL host (`db` in local Docker, Render internal host on Render) |
 | `DB_PORT` | No | Default `5432` |
+| `DB_NAME` | Yes | Database name |
+| `DB_USER` | Yes | Database user |
+| `DB_PASSWORD` | Yes | Database password |
 | `SECRET_KEY` | Yes | Django secret key (generate a new one for production) |
-| `DEBUG` | No | Set to `False` in production |
-| `ALLOWED_HOSTS` | Production | Comma-separated hosts, e.g. `your-app.onrender.com` |
+| `DEBUG` | No | `False` in production |
+| `ALLOWED_HOSTS` | Production | Comma-separated (e.g. `your-app.onrender.com`) |
 | `CORS_ALLOWED_ORIGINS` | If needed | Comma-separated frontend origins |
 | `FIREBASE_PROJECT_ID` | If using Firebase | Firebase project ID |
-| `FIREBASE_CREDENTIALS` | If using Firebase | Path to service account JSON or inline JSON string (never commit real file) |
+| `FIREBASE_CREDENTIALS` | If using Firebase | Path to service account JSON or inline JSON (on Render use inline) |
 | `GOOGLE_CLIENT_ID` | Optional | For “Continue with Google” |
-| `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_SECRET` | Optional | Image uploads |
+| `CLOUDINARY_*` | Optional | Image uploads |
 | `CHAPA_*` | Optional | Payment gateway |
-| `REDIS_URL` | Optional | Caching (if not set, in-memory cache is used) |
+| `REDIS_URL` | Optional | Caching (if unset, in-memory cache) |
+| `LOG_TO_FILE` | Optional | `true` for local file logs; omit on Render |
 
-See **`.env.example`** at the project root for the full list and short comments.
+See **`.env.example`** at the project root for the full list.
 
 ---
 
-## Portfolio note
+## Validation
 
-This repository is a **portfolio/demo project**.  
-
-- **PostgreSQL is run in Docker** (with a named volume for `/var/lib/postgresql/data`) to keep the stack self-contained and to avoid depending on a paid managed database on the free tier.  
-- For a real production deployment, you would typically switch to a managed PostgreSQL service and keep the backend Dockerized; the same environment variables (`DB_*`) are used.  
-- No secrets, API keys, or credentials are committed; the repo is intended to be safe to make public.
+- **Local:** Run `docker compose up --build`; backend uses Dockerized Postgres via `DB_HOST=db` and env from `.env`. Create superuser and use API at http://localhost:8000.
+- **Render:** Deploy backend as Docker Web Service; add Render PostgreSQL and set all `DB_*` and other env vars in the Render dashboard. Backend starts with Gunicorn and connects to Render Postgres; no Compose or local `.env` on the server.
+- **Secrets:** No `.env` or credential files are committed; `.gitignore` and `.dockerignore` exclude env files and Firebase credentials.
 
 ---
 

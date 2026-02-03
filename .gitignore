@@ -62,6 +62,13 @@ dist/
 web-build/
 .next/
 .turbo/
+# Expo / React Native builds
+android/app/build/
+ios/build/
+*.apk
+*.aab
+*.ipa
+*.app
 *.jks
 *.p8
 *.p12
@@ -73,23 +80,33 @@ web-build/
 !debug.keystore
 
 # =============================================================================
-# Firebase / credentials (non-public) – service account keys only
+# Firebase / credentials (non-public) – never commit
 # =============================================================================
 firebase/firebase_credentials.json
 **/firebase/*-adminsdk-*.json
-backend/firebase/*.json
+**/firebase/*.json
+backend/firebase/
+*.pem
+*credentials*.json
+!package.json
+!*.config.js
+!tsconfig*.json
+!app.json
+!firebase.json
 
 # =============================================================================
-# Docker (local overrides – do not commit)
+# Docker (local overrides – do not commit; keep docker-compose.yml)
 # =============================================================================
 docker-compose.override.yml
-docker-compose.*.yml
+docker-compose.*.local.yml
+docker-compose.override.*.yml
 
 # =============================================================================
 # IDE and OS
 # =============================================================================
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
@@ -100,6 +117,7 @@ docker-compose.*.yml
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # =============================================================================
 # Logs and temp
