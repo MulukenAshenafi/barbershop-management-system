@@ -18,13 +18,27 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:barberbook.page.link"
+      ]
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/App Icon.jpeg",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "barberbook"
+            }
+          ]
+        }
+      ]
     },
     "plugins": [
       [
