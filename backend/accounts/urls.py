@@ -23,7 +23,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     # Customer routes (matching original API structure)
     path('signup', UserViewSet.as_view({'post': 'signup'}), name='customer-signup'),
-    path('login', UserViewSet.as_view({'post': 'login'}), name='customer-login'),
+    path('login/', UserViewSet.as_view({'post': 'login'}), name='customer-login'),
     path('profile', UserViewSet.as_view({'get': 'profile'}), name='customer-profile'),
     path('update-profile', UserViewSet.as_view({'put': 'update_profile'}), name='customer-update-profile'),
     path('set-preferences', UserViewSet.as_view({'post': 'set_preferences'}), name='customer-set-preferences'),

@@ -113,12 +113,19 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
-        """User login endpoint."""
-        serializer = UserLoginSerializer(data=request.data)
+        """User login endpoint. Expects JSON: { "email": "...", "password": "..." }."""
+        data = request.data if isinstance(request.data, dict) else {}
+        if not data:
+            logger.warning("login: empty or non-dict body; Content-Type=%s", request.content_type)
+            return Response({
+                'success': False,
+                'message': 'Request body must be JSON with email and password.',
+                'errors': {'detail': 'Empty or invalid JSON body'},
+            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = UserLoginSerializer(data=data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
             token = RefreshToken.for_user(user)
-            
             response = Response({
                 'success': True,
                 'message': 'Login successful.',
@@ -136,22 +143,29 @@ class UserViewSet(viewsets.ModelViewSet):
                 'token': str(token.access_token),
                 'refresh': str(token),
             }, status=status.HTTP_200_OK)
-            
-            # Set HTTP-only cookie (similar to original implementation)
             response.set_cookie(
                 'token',
                 str(token.access_token),
-                max_age=15 * 24 * 60 * 60,  # 15 days
+                max_age=15 * 24 * 60 * 60,
                 httponly=True,
                 samesite='Strict',
-                secure=not request.get_host().startswith('localhost')
+                secure=not request.get_host().startswith('localhost'),
             )
-            
             return response
-        
+        errors = serializer.errors
+        first_msg = 'Invalid credentials'
+        for v in errors.values():
+            if isinstance(v, list) and v:
+                first_msg = str(v[0])
+                break
+            if isinstance(v, str):
+                first_msg = v
+                break
+        logger.info("login validation failed: %s", list(errors.keys()))
         return Response({
             'success': False,
-            'message': serializer.errors.get('non_field_errors', ['Invalid credentials'])[0]
+            'message': first_msg,
+            'errors': errors,
         }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
@@ -378,8 +392,17 @@ def register(request):
     """
     Register with first name, last name, email, password.
     Account is inactive until email is verified. Sends verification email.
+    Expects JSON: { "first_name", "last_name", "email", "password" } (or camelCase).
     """
-    serializer = DjangoRegisterSerializer(data=request.data)
+    data = request.data if isinstance(request.data, dict) else {}
+    if not data:
+        logger.warning("register: empty or non-dict body; Content-Type=%s", request.content_type)
+        return Response({
+            'success': False,
+            'message': 'Request body must be JSON with first_name, last_name, email, and password.',
+            'errors': {'detail': 'Empty or invalid JSON body'},
+        }, status=status.HTTP_400_BAD_REQUEST)
+    serializer = DjangoRegisterSerializer(data=data)
     if not serializer.is_valid():
         msg = 'Validation failed'
         errors = serializer.errors
