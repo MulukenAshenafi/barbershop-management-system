@@ -120,11 +120,12 @@ export async function signUpWithEmail(email, password, displayName = null) {
     await AsyncStorage.setItem(FIREBASE_AUTH_FLAG, '1');
     return { success: true };
   } catch (err) {
-    const msg = err.code === 'auth/email-already-in-use'
-      ? 'This email is already registered'
-      : err.code === 'auth/weak-password'
-        ? 'Password should be at least 6 characters'
-        : err.message || 'Sign up failed';
+    const backendMsg = err.response?.data?.message;
+    const msg = backendMsg
+      || (err.code === 'auth/email-already-in-use' ? 'This email is already registered' : null)
+      || (err.code === 'auth/weak-password' ? 'Password should be at least 6 characters' : null)
+      || err.message
+      || 'Sign up failed';
     return { success: false, error: msg };
   }
 }
@@ -144,9 +145,11 @@ export async function loginWithEmail(email, password) {
     await AsyncStorage.setItem(FIREBASE_AUTH_FLAG, '1');
     return { success: true };
     } catch (err) {
-      const msg = err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password'
-        ? 'Invalid email or password'
-        : err.message || 'Login failed';
+      const backendMsg = err.response?.data?.message;
+      const msg = backendMsg
+        || ((err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') ? 'Invalid email or password' : null)
+        || err.message
+        || 'Login failed';
       return { success: false, error: msg };
     }
   }

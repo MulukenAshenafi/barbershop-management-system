@@ -5,11 +5,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from .serializers import (
-    UserSerializer, UserRegistrationSerializer, UserLoginSerializer, UserUpdateSerializer
+    UserSerializer, UserRegistrationSerializer, UserLoginSerializer, UserUpdateSerializer,
+    DjangoRegisterSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    ChangeEmailRequestSerializer, GuestLoginSerializer,
 )
 from .permissions import IsAdminUser
 from .firebase_auth import verify_firebase_token, get_or_create_user_from_firebase
 from .google_auth import verify_google_id_token, get_or_create_user_from_google
+from .models import OneTimeToken
+from .email_sender import send_verification_email, send_password_reset_email, send_email_change_confirmation
 import logging
 
 logger = logging.getLogger(__name__)
@@ -131,6 +135,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     'specialization': user.specialization,
                 },
                 'token': str(token.access_token),
+                'refresh': str(token),
             }, status=status.HTTP_200_OK)
             
             # Set HTTP-only cookie (similar to original implementation)
@@ -403,3 +408,218 @@ def get_all_barbers(request):
         'success': False,
         'message': 'Access denied'
     }, status=status.HTTP_403_FORBIDDEN)
+
+
+# ----- Django-native auth (register, verify-email, password-reset, change-email, guest-login) -----
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register(request):
+    """
+    Register with first name, last name, email, password.
+    Account is inactive until email is verified. Sends verification email.
+    """
+    serializer = DjangoRegisterSerializer(data=request.data)
+    if not serializer.is_valid():
+        msg = 'Validation failed'
+        errors = serializer.errors
+        for v in errors.values():
+            if isinstance(v, list) and v:
+                msg = str(v[0])
+                break
+            if isinstance(v, str):
+                msg = v
+                break
+        return Response({'success': False, 'message': msg, 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+    user = serializer.save()
+    # Send verification email (token was created in serializer create())
+    ott = OneTimeToken.objects.filter(
+        user=user, purpose=OneTimeToken.PURPOSE_EMAIL_VERIFICATION
+    ).order_by('-created_at').first()
+    if ott:
+        try:
+            send_verification_email(user.email, ott.token)
+        except Exception as e:
+            logger.warning('Verification email send failed: %s', e)
+    return Response({
+        'success': True,
+        'message': 'Registration successful. Please check your email to verify your account.',
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def verify_email(request, token):
+    """
+    Verify email using token from link. Activates account and sets email_verified=True.
+    Optional: return JWT so app can log user in immediately.
+    """
+    from django.utils import timezone
+    ott = OneTimeToken.objects.filter(
+        token=token, purpose=OneTimeToken.PURPOSE_EMAIL_VERIFICATION
+    ).select_related('user').first()
+    if not ott:
+        return Response(
+            {'success': False, 'message': 'Invalid or expired verification link.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if ott.expires_at < timezone.now():
+        ott.delete()
+        return Response(
+            {'success': False, 'message': 'Verification link has expired.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user = ott.user
+    user.is_active = True
+    user.email_verified = True
+    user.save(update_fields=['is_active', 'email_verified'])
+    ott.delete()
+    # Optionally return JWT so the app can sign the user in
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'success': True,
+        'message': 'Email verified. You can now log in.',
+        'token': str(refresh.access_token),
+        'refresh': str(refresh),
+        'user': {
+            'id': str(user.uuid),
+            'name': user.name,
+            'email': user.email,
+            'role': user.role,
+            'profilePic': user.profile_pic,
+        },
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset(request):
+    """Request password reset. Sends email with secure link (no user enumeration)."""
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response({'success': False, 'message': 'Invalid email.', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    email = serializer.validated_data['email']
+    user = User.objects.filter(email=email).first()
+    if user and not user.is_guest:
+        ott = OneTimeToken.create_token(user, OneTimeToken.PURPOSE_PASSWORD_RESET, expires_in_hours=1)
+        try:
+            send_password_reset_email(user.email, ott.token)
+        except Exception as e:
+            logger.warning('Password reset email send failed: %s', e)
+    return Response({
+        'success': True,
+        'message': 'If an account exists with this email, you will receive a password reset link.',
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_confirm(request):
+    """Confirm password reset with token and new password."""
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        msg = serializer.errors.get('new_password', serializer.errors.get('token', ['Invalid input.']))
+        if isinstance(msg, list):
+            msg = msg[0] if msg else 'Invalid input.'
+        return Response({'success': False, 'message': msg, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    token_str = serializer.validated_data['token']
+    new_password = serializer.validated_data['new_password']
+    from django.utils import timezone
+    ott = OneTimeToken.objects.filter(
+        token=token_str, purpose=OneTimeToken.PURPOSE_PASSWORD_RESET
+    ).select_related('user').first()
+    if not ott:
+        return Response({'success': False, 'message': 'Invalid or expired reset link.'}, status=status.HTTP_400_BAD_REQUEST)
+    if ott.expires_at < timezone.now():
+        ott.delete()
+        return Response({'success': False, 'message': 'Reset link has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+    user = ott.user
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+    ott.delete()
+    return Response({'success': True, 'message': 'Password has been reset. You can log in with your new password.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_email(request):
+    """
+    Request email change. Sends confirmation to current email; change is applied when user confirms via link.
+    """
+    if request.user.is_guest:
+        return Response({'success': False, 'message': 'Guest users cannot change email.'}, status=status.HTTP_403_FORBIDDEN)
+    serializer = ChangeEmailRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        msg = 'Validation failed'
+        for v in serializer.errors.values():
+            if isinstance(v, list) and v:
+                msg = str(v[0])
+                break
+        return Response({'success': False, 'message': msg, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    new_email = serializer.validated_data['new_email']
+    ott = OneTimeToken.create_token(
+        request.user, OneTimeToken.PURPOSE_EMAIL_CHANGE, expires_in_hours=1,
+        extra_data={'new_email': new_email},
+    )
+    try:
+        send_email_change_confirmation(request.user.email, ott.token, new_email)
+    except Exception as e:
+        logger.warning('Email change confirmation send failed: %s', e)
+        return Response({'success': False, 'message': 'Failed to send confirmation email.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({
+        'success': True,
+        'message': 'A confirmation link has been sent to your current email address.',
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def change_email_confirm(request):
+    """
+    Confirm email change (token in query or body). Apply new_email from token's extra_data.
+    """
+    from django.utils import timezone
+    token_str = request.data.get('token') or request.query_params.get('token')
+    if not token_str:
+        return Response({'success': False, 'message': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    ott = OneTimeToken.objects.filter(
+        token=token_str, purpose=OneTimeToken.PURPOSE_EMAIL_CHANGE
+    ).select_related('user').first()
+    if not ott:
+        return Response({'success': False, 'message': 'Invalid or expired link.'}, status=status.HTTP_400_BAD_REQUEST)
+    if ott.expires_at < timezone.now():
+        ott.delete()
+        return Response({'success': False, 'message': 'Link has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+    new_email = (ott.extra_data or {}).get('new_email')
+    if not new_email:
+        return Response({'success': False, 'message': 'Invalid token data.'}, status=status.HTTP_400_BAD_REQUEST)
+    user = ott.user
+    user.email = new_email
+    user.save(update_fields=['email'])
+    ott.delete()
+    return Response({'success': True, 'message': 'Email address has been updated.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def guest_login(request):
+    """Create a temporary guest user and return JWT. No registration required."""
+    serializer = GuestLoginSerializer(data=request.data or {})
+    serializer.is_valid(raise_exception=False)
+    name = (serializer.validated_data or {}).get('name') or 'Guest'
+    user = User.objects.create_guest_user(name=name)
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'success': True,
+        'message': 'Signed in as guest.',
+        'user': {
+            'id': str(user.uuid),
+            'name': user.name,
+            'email': user.email or '',
+            'role': user.role,
+            'profilePic': user.profile_pic,
+            'isGuest': True,
+        },
+        'token': str(refresh.access_token),
+        'refresh': str(refresh),
+    }, status=status.HTTP_201_CREATED)

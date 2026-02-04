@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
+from .models import User, OneTimeToken
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -49,7 +49,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    """Legacy email/password login (for users created with password)."""
+    """Email/password login. Rejects if account is inactive or (Django-native) email not verified."""
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
@@ -66,8 +66,75 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Invalid email or password.')
         if not user.is_active:
             raise serializers.ValidationError('User account is disabled.')
+        # Django-native users (no Firebase, not guest) must verify email before login
+        if not user.is_guest and not user.firebase_uid and not user.email_verified:
+            raise serializers.ValidationError('Please verify your email before logging in.')
         attrs['user'] = user
         return attrs
+
+
+class DjangoRegisterSerializer(serializers.Serializer):
+    """Registration: first name, last name, email, password. Account inactive until email verified."""
+    first_name = serializers.CharField(max_length=50, trim_whitespace=True)
+    last_name = serializers.CharField(max_length=50, trim_whitespace=True)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('A user with this email already exists.')
+        return value
+
+    def create(self, validated_data):
+        first_name = validated_data['first_name'].strip()
+        last_name = validated_data['last_name'].strip()
+        name = f"{first_name} {last_name}".strip() or "User"
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['password'],
+            first_name=first_name,
+            last_name=last_name,
+            name=name,
+            is_active=False,
+            email_verified=False,
+            role='Customer',
+        )
+        # One-time token for email verification (e.g. 24h)
+        OneTimeToken.create_token(user, OneTimeToken.PURPOSE_EMAIL_VERIFICATION, expires_in_hours=24)
+        return user
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Request password reset: send email with link containing token."""
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            # Don't reveal whether email exists; still return success
+            pass
+        return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Confirm password reset with token and new password."""
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+
+class ChangeEmailRequestSerializer(serializers.Serializer):
+    """Request email change. Sends confirmation to current email; change applied when user confirms."""
+    new_email = serializers.EmailField()
+    current_password = serializers.CharField(write_only=True, required=False)
+
+    def validate_new_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('A user with this email already exists.')
+        return value
+
+
+class GuestLoginSerializer(serializers.Serializer):
+    """Optional display name for guest user. No required fields."""
+    name = serializers.CharField(max_length=50, required=False, allow_blank=True, default='Guest')
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
