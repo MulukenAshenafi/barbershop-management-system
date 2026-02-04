@@ -269,27 +269,29 @@ SPECTACULAR_SETTINGS = {
     ],
 }
 
-# Caching Configuration (Redis) - Optional
-# Defaults to Docker service name 'redis' when in Docker, '127.0.0.1' locally
-REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
-try:
-    import django_redis
-    CACHES = {
-        'default': {
-            'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': REDIS_URL,
-            'OPTIONS': {
-                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            },
-            'KEY_PREFIX': 'bsbs',
-            'TIMEOUT': 300,  # 5 minutes default
+# Caching and sessions: use Redis only when REDIS_URL is set (e.g. Docker or paid Redis).
+# When unset (e.g. Render free tier), use in-memory cache and database sessions so /admin works.
+REDIS_URL = (os.getenv('REDIS_URL') or '').strip()
+_use_redis = bool(REDIS_URL)
+if _use_redis:
+    try:
+        import django_redis
+        CACHES = {
+            'default': {
+                'BACKEND': 'django_redis.cache.RedisCache',
+                'LOCATION': REDIS_URL,
+                'OPTIONS': {
+                    'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                },
+                'KEY_PREFIX': 'bsbs',
+                'TIMEOUT': 300,
+            }
         }
-    }
-    # Session cache (optional, uses default cache)
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-    SESSION_CACHE_ALIAS = 'default'
-except ImportError:
-    # Fallback to local memory cache if Redis not available
+        SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+        SESSION_CACHE_ALIAS = 'default'
+    except ImportError:
+        _use_redis = False
+if not _use_redis:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -297,6 +299,7 @@ except ImportError:
             'TIMEOUT': 300,
         }
     }
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # Logging: console always; file only when LOG_TO_FILE=true (e.g. local dev). On Render, use console only.
 _log_to_file = os.getenv('LOG_TO_FILE', 'false').lower() == 'true'
