@@ -24,6 +24,9 @@ python manage.py collectstatic --noinput || true
 echo "Running database migrations..."
 python manage.py migrate --noinput
 
+# One-time admin bootstrap from ADMIN_EMAIL/ADMIN_PASSWORD (safe if run multiple times)
+python manage.py create_admin || true
+
 echo "Starting server..."
 
 # Execute the main command (from CMD or docker-compose)
