@@ -42,7 +42,7 @@ export async function loginWithEmail(email, password) {
     return { success: false, error: 'Please enter email and password' };
   }
   try {
-    const { data } = await api.post('auth/login', {
+    const { data } = await api.post('auth/login/', {
       email: email.trim().toLowerCase(),
       password,
     });
