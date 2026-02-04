@@ -16,8 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/common/Button';
 import config from '../../config';
 import { isAuthenticated } from '../../services/auth';
-import { exchangeGoogleToken, loginWithApple, isFirebaseConfigured } from '../../services/authService';
+import { exchangeGoogleToken, loginWithApple, guestLogin } from '../../services/authService';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   fontSizes,
   spacing,
@@ -32,6 +33,7 @@ const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 export default function WelcomeScreen() {
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
+  const { checkAuth } = useAuth();
   const [loading, setLoading] = useState(null);
   const [googleReady, setGoogleReady] = useState(false);
 
@@ -52,7 +54,7 @@ export default function WelcomeScreen() {
   }, [request]);
 
   useEffect(() => {
-    if (config.forceWelcome) return; // Stay on Welcome when force-welcome is set (e.g. for testing)
+    if (config.forceWelcome) return;
     let cancelled = false;
     isAuthenticated().then((ok) => {
       if (!cancelled && ok) {
@@ -75,19 +77,22 @@ export default function WelcomeScreen() {
     exchangeGoogleToken(idToken)
       .then(({ success, error }) => {
         if (!cancelled) setLoading(null);
-        if (success) navigation.reset({ index: 0, routes: [{ name: 'home' }] });
-        else Alert.alert('Google Sign-In', error || 'Sign-in failed');
+        if (success) {
+          checkAuth().then(() => navigation.reset({ index: 0, routes: [{ name: 'home' }] }));
+        } else {
+          Alert.alert('Google Sign-In', error || 'Sign-in failed');
+        }
       })
       .catch(() => {
         if (!cancelled) setLoading(null);
         Alert.alert('Google Sign-In', 'Something went wrong. Try Email sign-in.');
       });
     return () => { cancelled = true; };
-  }, [response?.type, response?.params, loading, navigation]);
+  }, [response?.type, response?.params, loading, navigation, checkAuth]);
 
   const handleGoogle = () => {
     if (!googleReady) {
-      Alert.alert('Google Sign-In', 'Not configured yet. Use Email to sign in.');
+      Alert.alert('Google Sign-In', 'Not configured. Use Email to sign in.');
       return;
     }
     setLoading('google');
@@ -99,16 +104,32 @@ export default function WelcomeScreen() {
     setLoading('apple');
     const { success, error } = await loginWithApple();
     setLoading(null);
-    if (success) navigation.reset({ index: 0, routes: [{ name: 'home' }] });
-    else Alert.alert('Apple Sign-In', error || 'Sign-in failed');
+    if (success) {
+      await checkAuth();
+      navigation.reset({ index: 0, routes: [{ name: 'home' }] });
+    } else {
+      Alert.alert('Apple Sign-In', error || 'Sign-in failed');
+    }
   };
 
   const handleSignIn = () => {
-    navigation.navigate('email-sign-in');
+    navigation.navigate('login');
   };
 
   const handleCreateAccount = () => {
     navigation.navigate('register');
+  };
+
+  const handleGuest = async () => {
+    setLoading('guest');
+    const { success, error } = await guestLogin();
+    setLoading(null);
+    if (success) {
+      await checkAuth();
+      navigation.reset({ index: 0, routes: [{ name: 'home' }] });
+    } else {
+      Alert.alert('Guest Sign-In', error || 'Something went wrong.');
+    }
   };
 
   return (
@@ -120,7 +141,7 @@ export default function WelcomeScreen() {
           BarberBook — find barbershops, book appointments, and shop products in one app.
         </Text>
         <Text style={[styles.barbershopHint, { color: colors.textSecondary }]}>
-          Barbershop owners: sign in or create an account to list your shop and manage bookings from your account.
+          Barbershop owners: sign in or create an account to list your shop and manage bookings.
         </Text>
 
         <View style={styles.ctas}>
@@ -170,16 +191,14 @@ export default function WelcomeScreen() {
             style={styles.emailBtn}
             disabled={!!loading}
           />
-          {isFirebaseConfigured() && (
-            <TouchableOpacity
-              style={[styles.socialBtn, { backgroundColor: colors.card, borderColor: colors.gray200 }]}
-              onPress={() => navigation.navigate('phone-login')}
-              disabled={!!loading}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.socialBtnText, { color: colors.text }]}>Sign in with phone</Text>
-            </TouchableOpacity>
-          )}
+          <Button
+            title="Continue as Guest"
+            onPress={handleGuest}
+            variant="outline"
+            fullWidth
+            style={styles.emailBtn}
+            disabled={!!loading}
+          />
           <Button
             title="Create account"
             onPress={handleCreateAccount}

@@ -159,11 +159,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
-# REST Framework Configuration
-# Firebase ID token is primary; JWT kept for legacy/admin if needed.
+# REST Framework Configuration – JWT only (Django-native auth)
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'accounts.authentication.FirebaseAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -258,10 +256,6 @@ CHAPA_PUBLIC_KEY = os.getenv('CHAPA_PUBLIC_KEY', '')
 CHAPA_WEBHOOK_SECRET = os.getenv('CHAPA_WEBHOOK_SECRET', '')
 CHAPA_WEBHOOK_URL = os.getenv('CHAPA_WEBHOOK_URL', '')
 CHAPA_ENCRYPTION_KEY = os.getenv('CHAPA_ENCRYPTION_KEY', '') or os.getenv('CHAPA_ENCRIPTION_KEY', '')
-
-# Firebase (auth only): backend uses FIREBASE_CREDENTIALS_BASE64 in accounts.firebase_auth (base64-encoded service account JSON).
-# FIREBASE_PROJECT_ID is optional for reference; Firebase Admin derives project from credentials.
-FIREBASE_PROJECT_ID = (os.getenv('FIREBASE_PROJECT_ID') or '').strip()
 
 # Google OAuth (for "Continue with Google" – use same client ID as Expo EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')

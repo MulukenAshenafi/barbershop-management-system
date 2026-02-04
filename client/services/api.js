@@ -1,14 +1,12 @@
 /**
  * Shared API client for all backend requests. Use this instead of raw axios so that:
  * - Base URL comes from config (production or EXPO_PUBLIC_API_URL).
- * - Authorization: Bearer <Firebase-ID-Token> (or legacy JWT) is attached automatically.
+ * - Authorization: Bearer <JWT> is attached from stored token; 401 triggers refresh or logout.
  * - X-Barbershop-Id is set when a barbershop is selected.
- * - 401 triggers optional unauthorized handler (e.g. session expired).
  */
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../config';
-import { FIREBASE_AUTH_FLAG } from './auth';
 
 let unauthorizedHandler = null;
 let subscriptionExpiredHandler = null;
@@ -39,22 +37,8 @@ const api = axios.create({
 api.interceptors.request.use(
   async (req) => {
     try {
-      const firebaseMode = await AsyncStorage.getItem(FIREBASE_AUTH_FLAG);
-      if (firebaseMode) {
-        try {
-          const { getFirebaseAuth } = require('./firebase');
-          const auth = getFirebaseAuth();
-          const user = auth?.currentUser;
-          if (user) {
-            const idToken = await user.getIdToken(false);
-            if (idToken) req.headers.Authorization = `Bearer ${idToken}`;
-          }
-        } catch (_) {}
-      }
-      if (!req.headers.Authorization) {
-        const token = await AsyncStorage.getItem('token');
-        if (token) req.headers.Authorization = `Bearer ${token}`;
-      }
+      const token = await AsyncStorage.getItem('token');
+      if (token) req.headers.Authorization = `Bearer ${token}`;
       if (activeBarbershopIdForApi) {
         req.headers['X-Barbershop-Id'] = activeBarbershopIdForApi;
       }
@@ -73,13 +57,28 @@ api.interceptors.response.use(
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true;
       const hadAuthHeader = !!original.headers?.Authorization;
+      // Try refresh token once
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      if (hadAuthHeader && refreshToken) {
+        try {
+          const { data } = await axios.post(`${config.apiBaseUrl}/auth/token/refresh/`, {
+            refresh: refreshToken,
+          });
+          if (data.access) {
+            await AsyncStorage.setItem('token', data.access);
+            original.headers.Authorization = `Bearer ${data.access}`;
+            return api(original);
+          }
+        } catch (_) {
+          // refresh failed, clear and notify
+        }
+      }
       if (hadAuthHeader) {
         try {
           await AsyncStorage.multiRemove([
             'token',
             'refreshToken',
             'customerData',
-            FIREBASE_AUTH_FLAG,
             'active_barbershop_id',
           ]);
         } catch (e) {
