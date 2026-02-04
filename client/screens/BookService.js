@@ -171,6 +171,7 @@ const BookService = ({ route, navigation }) => {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="always"
     >
       <Text style={styles.pageTitle}>Book your service</Text>
       <Text style={styles.serviceName}>{serviceName}</Text>

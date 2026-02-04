@@ -128,7 +128,7 @@ const Profile = ({ route, navigation }) => {
     <ScrollView
       contentContainerStyle={styles.scroll}
       showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+      keyboardShouldPersistTaps="always"
     >
       <View style={styles.avatarSection}>
         <OptimizedImage

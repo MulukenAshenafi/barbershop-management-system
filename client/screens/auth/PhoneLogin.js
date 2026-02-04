@@ -122,7 +122,8 @@ export default function PhoneLogin({ navigation }) {
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scroll}
-      keyboardShouldPersistTaps="handled"
+      keyboardShouldPersistTaps="always"
+      keyboardDismissMode="none"
     >
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>Sign in with phone</Text>

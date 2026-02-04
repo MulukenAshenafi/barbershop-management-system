@@ -182,6 +182,7 @@ const Account = ({ navigation, route }) => {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
       >
         <View style={styles.profileSection}>
           <OptimizedImage

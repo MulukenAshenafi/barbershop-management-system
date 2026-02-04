@@ -101,7 +101,7 @@ export default function JoinBarbershopScreen() {
   };
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="always">
       <Text style={styles.title}>Join a Barbershop</Text>
       <Text style={styles.subtitle}>Enter an invite code from your shop owner, or search for a shop.</Text>
 

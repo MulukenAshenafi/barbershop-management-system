@@ -150,7 +150,7 @@ export default function BarbershopRegistrationScreen() {
   };
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="always">
       <Text style={styles.title}>Register your Barbershop</Text>
       <Text style={styles.stepLabel}>Step {step} of 4</Text>
 

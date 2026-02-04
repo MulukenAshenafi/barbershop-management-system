@@ -296,10 +296,11 @@ class UserViewSet(viewsets.ModelViewSet):
                 },
             }, status=status.HTTP_200_OK)
         except Exception as e:
-            logger.error("Firebase login error: %s", str(e), exc_info=True)
+            err_msg = str(e) or 'Firebase authentication failed'
+            logger.error("firebase-login failed (401): %s", err_msg, exc_info=True)
             return Response({
                 'success': False,
-                'message': str(e) or 'Firebase authentication failed',
+                'message': err_msg,
             }, status=status.HTTP_401_UNAUTHORIZED)
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='social/google')

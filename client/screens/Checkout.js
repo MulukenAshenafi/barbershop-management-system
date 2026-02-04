@@ -173,7 +173,7 @@ const Checkout = ({ navigation }) => {
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
       >
         <Text style={[styles.heading, { color: colors.text }]}>Checkout</Text>
         <Card style={styles.totalCard}>
