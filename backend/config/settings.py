@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     # Third party
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'cloudinary',
     'cloudinary_storage',
@@ -205,7 +206,7 @@ try:
 except ImportError:
     pass
 
-# JWT Settings
+# JWT Settings (Django-native auth: access + refresh; protect all API endpoints)
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
@@ -218,6 +219,20 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 }
+
+# Email (verification, password reset, email change). Use SMTP backend when env is set.
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend' if os.getenv('EMAIL_HOST') else 'django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@barberbook.local')
+# Base URL for verification/reset links in emails (e.g. https://yourapp.com or barberbook:// for deep link)
+EMAIL_VERIFICATION_BASE_URL = (os.getenv('EMAIL_VERIFICATION_BASE_URL') or '').strip() or 'http://localhost:8081'
 
 # CORS: from env only. Comma-separated list of allowed origins (e.g. https://yourapp.onrender.com,http://localhost:19006).
 # If not set, default is empty list; set CORS_ALLOWED_ORIGINS in production and local dev as needed.
