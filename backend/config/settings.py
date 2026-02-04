@@ -219,15 +219,10 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# CORS: fully from env. Set CORS_ALLOWED_ORIGINS (comma-separated) in production.
-_cors = os.getenv('CORS_ALLOWED_ORIGINS', '').strip()
-if _cors:
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors.split(',') if o.strip()]
-else:
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000", "http://127.0.0.1:3000",
-        "http://localhost:19006", "http://localhost:8081", "http://127.0.0.1:8081",
-    ]
+# CORS: from env only. Comma-separated list of allowed origins (e.g. https://yourapp.onrender.com,http://localhost:19006).
+# If not set, default is empty list; set CORS_ALLOWED_ORIGINS in production and local dev as needed.
+_cors_raw = (os.getenv('CORS_ALLOWED_ORIGINS') or '').strip()
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split(',') if o.strip()] if _cors_raw else []
 CORS_ALLOW_CREDENTIALS = True
 
 # Cloudinary (optional). When set, media uploads go to Cloudinary. Production: use Cloudinary or S3.
@@ -249,9 +244,9 @@ CHAPA_WEBHOOK_SECRET = os.getenv('CHAPA_WEBHOOK_SECRET', '')
 CHAPA_WEBHOOK_URL = os.getenv('CHAPA_WEBHOOK_URL', '')
 CHAPA_ENCRYPTION_KEY = os.getenv('CHAPA_ENCRYPTION_KEY', '') or os.getenv('CHAPA_ENCRIPTION_KEY', '')
 
-# Firebase Settings
-FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
-FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', '')
+# Firebase (auth only): backend uses FIREBASE_CREDENTIALS_BASE64 in accounts.firebase_auth (base64-encoded service account JSON).
+# FIREBASE_PROJECT_ID is optional for reference; Firebase Admin derives project from credentials.
+FIREBASE_PROJECT_ID = (os.getenv('FIREBASE_PROJECT_ID') or '').strip()
 
 # Google OAuth (for "Continue with Google" – use same client ID as Expo EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')

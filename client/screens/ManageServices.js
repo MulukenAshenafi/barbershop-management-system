@@ -9,10 +9,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import axios from "axios";
+import api from "../services/api";
 import { Picker } from "@react-native-picker/picker";
 import { useNavigation } from "@react-navigation/native";
-import config from "../config";
 import { getFileForFormData } from "../utils/imageUpload";
 
 const ManageServices = () => {
@@ -66,8 +65,8 @@ const ManageServices = () => {
       const file = await getFileForFormData(image, "service-image.jpg", "image/jpeg");
       if (file) formData.append("file", file);
 
-      await axios.post(`${config.apiBaseUrl}/service/create`, formData, {
-        headers: { "Content-Type": false },
+      await api.post("/service/create", formData, {
+        headers: { "Content-Type": undefined },
       });
       Alert.alert("Success", "Service created successfully");
       navigation.goBack();

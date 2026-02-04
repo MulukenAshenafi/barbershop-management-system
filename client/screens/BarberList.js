@@ -6,8 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import axios from "axios";
-import config from "../config";
+import api from "../services/api";
 
 const BarberList = () => {
   const [barbers, setBarbers] = useState([]);
@@ -17,9 +16,7 @@ const BarberList = () => {
   useEffect(() => {
     const fetchBarbers = async () => {
       try {
-        const res = await axios.get(`${config.apiBaseUrl}/barbers/get-all`, {
-          headers: { "Content-Type": "application/json" },
-        });
+        const res = await api.get("/barbers/get-all");
         if (res.data.success) {
           setBarbers(res.data.barbers);
         } else {

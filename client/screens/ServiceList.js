@@ -6,8 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import axios from "axios";
-import config from "../config";
+import api from "../services/api";
 
 const ServiceList = () => {
   const [services, setServices] = useState([]);
@@ -17,9 +16,7 @@ const ServiceList = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const res = await axios.get(`${config.apiBaseUrl}/service/get-all`, {
-          headers: { "Content-Type": "application/json" },
-        });
+        const res = await api.get("/service/get-all");
         if (res.data.success && Array.isArray(res.data.services)) {
           setServices(res.data.services);
         } else {

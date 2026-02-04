@@ -7,8 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import axios from "axios";
-import config from "../config"; // Adjust the import as needed
+import api from "../services/api";
 
 const ManageBookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -18,9 +17,7 @@ const ManageBookings = () => {
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const res = await axios.get(`${config.apiBaseUrl}/booking/get-all`, {
-          headers: { "Content-Type": "application/json" },
-        });
+        const res = await api.get("/booking/get-all");
         if (res.data.success) {
           setBookings(res.data.bookings);
         } else {
@@ -39,9 +36,7 @@ const ManageBookings = () => {
   // Handle booking approval (example action)
   const handleApproveBooking = async (bookingId) => {
     try {
-      const res = await axios.patch(
-        `${config.apiBaseUrl}/booking/approve/${bookingId}`
-      );
+      const res = await api.patch(`/booking/approve/${bookingId}`);
       if (res.data.success) {
         Alert.alert("Success", "Booking approved successfully!");
         // Refresh bookings after action

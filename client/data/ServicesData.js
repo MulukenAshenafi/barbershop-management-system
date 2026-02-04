@@ -1,5 +1,4 @@
-import axios from "axios";
-import config from "../config";
+import api from "../services/api";
 
 // Initialize the ServicesData array
 export let ServicesData = [];
@@ -7,7 +6,7 @@ export let ServicesData = [];
 // Function to fetch services from the backend
 export const fetchServicesData = async () => {
   try {
-    const response = await axios.get(`${config.apiBaseUrl}/service/get-all`);
+    const response = await api.get("/service/get-all");
     const services = response.data?.services;
     if (!Array.isArray(services)) {
       ServicesData = [];

@@ -1,12 +1,10 @@
 // config.js – API base URL for the Django backend
-// Set EXPO_PUBLIC_API_URL in .env (e.g. http://YOUR_IP:8000/api) when using a physical device.
+// Production default; override with EXPO_PUBLIC_API_URL in .env for dev/staging (e.g. http://YOUR_IP:8000/api).
 import { Platform } from "react-native";
 
+const PRODUCTION_API_URL = "https://barbershop-management-system-xxv5.onrender.com/api";
+
 const getApiBaseUrl = () => {
-  // Web: always use localhost so browser can reach backend (avoids device IP / CORS)
-  if (Platform.OS === "web") {
-    return "http://localhost:8000/api";
-  }
   const raw = typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
     ? String(process.env.EXPO_PUBLIC_API_URL).trim()
     : "";
@@ -14,12 +12,14 @@ const getApiBaseUrl = () => {
   if (envUrl) {
     return envUrl.replace(/\/$/, "");
   }
-  // Android emulator: 10.0.2.2 is the host machine
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000/api";
+  // No env set: use production. For local dev, set EXPO_PUBLIC_API_URL in .env.
+  if (Platform.OS === "web") {
+    return PRODUCTION_API_URL;
   }
-  // iOS simulator: backend on same machine
-  return "http://localhost:8000/api";
+  if (Platform.OS === "android") {
+    return PRODUCTION_API_URL;
+  }
+  return PRODUCTION_API_URL;
 };
 
 const getForceWelcome = () => {

@@ -1,13 +1,13 @@
 """
 Firebase Authentication: token verification and user sync.
-Uses Firebase Admin SDK; credentials from environment (path or JSON string).
+Uses Firebase Admin SDK; credentials from FIREBASE_CREDENTIALS_BASE64 (base64-encoded JSON).
 No Firestore/Realtime DB; auth only. No passwords or OTPs stored in backend.
 """
+import base64
 import json
 import logging
 import os
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -27,55 +27,39 @@ _firebase_app = None
 
 
 def get_firebase_app():
-    """Initialize and return Firebase app from env. Supports path (absolute or relative to project root), inline JSON, or base64 JSON."""
+    """
+    Initialize and return Firebase app from FIREBASE_CREDENTIALS_BASE64.
+    Decodes base64 to JSON and uses firebase_admin.credentials.Certificate().
+    If FIREBASE_CREDENTIALS_BASE64 is missing, skips initialization and logs a warning.
+    """
     global _firebase_app
     if not FIREBASE_AVAILABLE:
         logger.warning("Firebase Admin SDK not installed. pip install firebase-admin")
         return None
     if _firebase_app is not None:
         return _firebase_app
-    raw = getattr(settings, 'FIREBASE_CREDENTIALS', None) or os.getenv('FIREBASE_CREDENTIALS', '')
-    if not raw or not raw.strip():
-        logger.warning("FIREBASE_CREDENTIALS not set")
+
+    raw = (os.getenv('FIREBASE_CREDENTIALS_BASE64') or '').strip()
+    if not raw:
+        logger.warning(
+            "FIREBASE_CREDENTIALS_BASE64 is not set. Firebase Admin will not be initialized. "
+            "Set it to base64-encoded service account JSON for Firebase auth (e.g. on Render)."
+        )
         return None
-    raw = raw.strip()
+
     try:
-        # 1) File path: as-is, relative to BASE_DIR, relative to project root, and without "backend/" prefix (Docker: /app is backend root)
-        path_candidates = [
-            raw,
-            os.path.join(settings.BASE_DIR, raw),
-            os.path.join(settings.BASE_DIR.parent, raw),
-        ]
-        if raw.startswith("backend/"):
-            path_candidates.append(os.path.join(settings.BASE_DIR, raw.replace("backend/", "", 1)))
-        for path in path_candidates:
-            if path and os.path.isfile(path):
-                cred = credentials.Certificate(path)
-                break
-        else:
-            # 2) Inline JSON
-            try:
-                cred_dict = json.loads(raw)
-                cred = credentials.Certificate(cred_dict)
-            except json.JSONDecodeError:
-                # 3) Base64-encoded JSON (only if string does not look like a path)
-                if "/" in raw or "\\" in raw or not raw.startswith("ey"):
-                    logger.warning(
-                        "FIREBASE_CREDENTIALS: file not found at %s (tried as path, BASE_DIR, and project root). "
-                        "In Docker, mount the JSON file or set FIREBASE_CREDENTIALS to inline JSON.",
-                        raw[:80] + "..." if len(raw) > 80 else raw,
-                    )
-                    return None
-                import base64
-                try:
-                    decoded = base64.b64decode(raw).decode('utf-8')
-                    cred_dict = json.loads(decoded)
-                    cred = credentials.Certificate(cred_dict)
-                except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
-                    logger.warning("FIREBASE_CREDENTIALS: not valid base64 JSON")
-                    return None
+        decoded = base64.b64decode(raw).decode('utf-8')
+        cred_dict = json.loads(decoded)
+        cred = credentials.Certificate(cred_dict)
         _firebase_app = firebase_admin.initialize_app(cred)
+        logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_BASE64.")
         return _firebase_app
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as e:
+        logger.exception(
+            "FIREBASE_CREDENTIALS_BASE64 is not valid base64-encoded JSON. Firebase init skipped: %s",
+            e,
+        )
+        return None
     except Exception as e:
         logger.exception("Firebase init failed: %s", e)
         return None
@@ -90,7 +74,9 @@ def verify_firebase_token(id_token: str) -> dict:
         raise Exception("Firebase Admin SDK not installed")
     app = get_firebase_app()
     if not app:
-        raise Exception("Firebase not initialized. Check FIREBASE_CREDENTIALS.")
+        raise Exception(
+            "Firebase not initialized. Set FIREBASE_CREDENTIALS_BASE64 (base64-encoded service account JSON)."
+        )
     try:
         return auth.verify_id_token(id_token, app=app)
     except Exception as e:

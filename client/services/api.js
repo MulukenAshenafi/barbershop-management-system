@@ -1,6 +1,9 @@
 /**
- * API client: Authorization Bearer (Firebase ID token or legacy JWT), X-Barbershop-Id, 401 handling.
- * When Firebase auth is used, ID token is obtained from Firebase SDK (auto-refresh).
+ * Shared API client for all backend requests. Use this instead of raw axios so that:
+ * - Base URL comes from config (production or EXPO_PUBLIC_API_URL).
+ * - Authorization: Bearer <Firebase-ID-Token> (or legacy JWT) is attached automatically.
+ * - X-Barbershop-Id is set when a barbershop is selected.
+ * - 401 triggers optional unauthorized handler (e.g. session expired).
  */
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
