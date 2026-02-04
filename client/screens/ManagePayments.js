@@ -6,8 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import axios from "axios";
-import config from "../config"; // Adjust this import path according to your project structure
+import api from "../services/api";
 
 const ManagePayments = () => {
   const [payments, setPayments] = useState([]);
@@ -19,12 +18,7 @@ const ManagePayments = () => {
     const fetchPayments = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(
-          `${config.apiBaseUrl}/booking/payments/all`, // Updated to match the correct endpoint
-          {
-            headers: { "Content-Type": "application/json" },
-          }
-        );
+        const res = await api.get("/booking/payments/all");
         if (res.data.success) {
           setPayments(res.data.payments);
         } else {

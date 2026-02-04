@@ -7,8 +7,7 @@ import {
   Alert,
   TextInput,
 } from "react-native";
-import axios from "axios";
-import config from "../config";
+import api from "../services/api";
 
 const ManageBarbers = ({ navigation }) => {
   const [name, setName] = useState("");
@@ -34,19 +33,15 @@ const ManageBarbers = ({ navigation }) => {
     }
 
     try {
-      const res = await axios.post(
-        `${config.apiBaseUrl}/barbers/signup`,
-        {
-          name,
-          email,
-          password,
-          phone: contact,
-          location,
-          specialization,
-          role: "Barber",
-        },
-        { headers: { "Content-Type": "application/json" } }
-      );
+      const res = await api.post("/barbers/signup", {
+        name,
+        email,
+        password,
+        phone: contact,
+        location,
+        specialization,
+        role: "Barber",
+      });
 
       setResponse(res.data);
     } catch (err) {
