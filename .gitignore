@@ -85,6 +85,10 @@ ios/build/
 firebase/firebase_credentials.json
 **/firebase/*-adminsdk-*.json
 **/firebase/*.json
+*-adminsdk-*.json
+firebase_base64.txt
+*_base64.txt
+*base64*.txt
 backend/firebase/
 *.pem
 *credentials*.json
@@ -100,6 +104,17 @@ backend/firebase/
 docker-compose.override.yml
 docker-compose.*.local.yml
 docker-compose.override.*.yml
+
+# =============================================================================
+# Windows reserved names (do not commit)
+# =============================================================================
+nul
+NUL
+Nul
+con
+CON
+PRN
+AUX
 
 # =============================================================================
 # IDE and OS

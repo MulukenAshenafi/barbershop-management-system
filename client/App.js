@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useRef, useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet, Linking, Alert } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Linking, Alert, Platform } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { NavigationContainer } from "@react-navigation/native";
@@ -279,6 +280,7 @@ export default function App() {
   }, []);
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ErrorBoundary>
       <SafeAreaProvider>
       <ThemeProvider>
@@ -356,6 +358,7 @@ export default function App() {
       </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 

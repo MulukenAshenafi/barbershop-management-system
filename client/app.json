@@ -24,6 +24,7 @@
       ]
     },
     "android": {
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/App Icon.jpeg",
         "backgroundColor": "#ffffff"

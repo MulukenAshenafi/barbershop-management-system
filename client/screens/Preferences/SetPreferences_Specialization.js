@@ -46,7 +46,7 @@ const SetPreferences_Specialization = ({ route, navigation }) => {
   }, [error]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="always">
       <View style={styles.inputContainer}>
         <Text style={styles.label}>
           {user.role === "Customer"

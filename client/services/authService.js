@@ -236,7 +236,9 @@ export async function sendEmailSignInLink(email) {
     let msg = 'Failed to send sign-in link';
     if (code === 'auth/invalid-email') msg = 'Invalid email address';
     else if (code === 'auth/too-many-requests') msg = 'Too many attempts. Try again later.';
-    else if (code === 'auth/configuration-not-found' || code === 'auth/operation-not-allowed') {
+    else if (code === 'auth/quota-exceeded') {
+      msg = 'Daily limit for sign-in links reached. Use "Continue with password" below, or try again tomorrow.';
+    } else if (code === 'auth/configuration-not-found' || code === 'auth/operation-not-allowed') {
       msg = 'Email link sign-in is not enabled. In Firebase Console go to Authentication > Sign-in method, enable Email/Password, then enable "Email link" and save.';
     } else if (code === 'auth/unauthorized-continue-uri') {
       const url = getEmailSignInLinkUrl();
@@ -246,19 +248,45 @@ export async function sendEmailSignInLink(email) {
   }
 }
 
+/**
+ * Resolve the URL we use for Firebase signInWithEmailLink.
+ * When the app is opened via barberbook://email-signin?apiKey=...&oobCode=..., Firebase expects
+ * the full HTTPS action URL. Reconstruct it from the same base we used when sending the link.
+ */
+export function resolveEmailLinkUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+  if (trimmed.startsWith('barberbook://email-signin') || trimmed.startsWith('barberbook://')) {
+    try {
+      const parsed = new URL(trimmed);
+      const linkParam = parsed.searchParams.get('link');
+      if (linkParam) return decodeURIComponent(linkParam);
+      const base = getEmailSignInLinkUrl();
+      const baseUrl = base.includes('?') ? base.split('?')[0] : base;
+      return baseUrl + (parsed.search || '');
+    } catch (_) {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+
 export function isEmailSignInLink(url) {
   if (!url || !isFirebaseConfigured()) return false;
   const auth = getFirebaseAuth();
-  return isSignInWithEmailLink(auth, url);
+  const resolved = resolveEmailLinkUrl(url);
+  return isSignInWithEmailLink(auth, resolved);
 }
 
 export async function completeEmailLinkSignIn(email, linkUrl) {
   if (!email?.trim() || !linkUrl) {
     return { success: false, error: 'Email and link are required' };
   }
+  const resolvedUrl = resolveEmailLinkUrl(linkUrl);
   try {
     const auth = getFirebaseAuth();
-    const cred = await signInWithEmailLink(auth, email.trim().toLowerCase(), linkUrl);
+    const cred = await signInWithEmailLink(auth, email.trim().toLowerCase(), resolvedUrl);
     await AsyncStorage.removeItem(EMAIL_LINK_EMAIL);
     const idToken = await cred.user.getIdToken();
     const user = await syncUserWithBackend(idToken);

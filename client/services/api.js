@@ -30,7 +30,7 @@ export function setActiveBarbershopIdForApi(id) {
 
 const api = axios.create({
   baseURL: config.apiBaseUrl,
-  timeout: 20000,
+  timeout: 60000, // 60s so Render free-tier cold start (~30–60s) can complete
   headers: {
     'Content-Type': 'application/json',
   },

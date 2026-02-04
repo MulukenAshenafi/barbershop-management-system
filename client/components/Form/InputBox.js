@@ -32,6 +32,8 @@ const InputBox = ({
 
   return (
     <View
+      pointerEvents="box-none"
+      collapsable={Platform.OS !== 'android'}
       style={[
         styles.wrapper,
         {
@@ -42,6 +44,7 @@ const InputBox = ({
       ]}
     >
       <TextInput
+        editable
         style={[styles.input, { color: colors.text }, isPassword && styles.inputPassword]}
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}

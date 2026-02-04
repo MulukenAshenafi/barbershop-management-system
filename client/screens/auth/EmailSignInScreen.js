@@ -64,8 +64,8 @@ export default function EmailSignInScreen({ navigation }) {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <TouchableOpacity
@@ -81,9 +81,9 @@ export default function EmailSignInScreen({ navigation }) {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
           showsVerticalScrollIndicator={false}
-          keyboardDismissMode="on-drag"
         >
           <Text style={[styles.pageTitle, { color: colors.text }]}>Sign in with email</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>

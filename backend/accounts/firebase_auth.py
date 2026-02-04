@@ -39,7 +39,7 @@ def get_firebase_app():
     if _firebase_app is not None:
         return _firebase_app
 
-    raw = (os.getenv('FIREBASE_CREDENTIALS_BASE64') or '').strip()
+    raw = (os.getenv('FIREBASE_CREDENTIALS_BASE64') or '').strip().replace('\n', '').replace('\r', '')
     if not raw:
         logger.warning(
             "FIREBASE_CREDENTIALS_BASE64 is not set. Firebase Admin will not be initialized. "
@@ -48,7 +48,7 @@ def get_firebase_app():
         return None
 
     try:
-        decoded = base64.b64decode(raw).decode('utf-8')
+        decoded = base64.b64decode(raw).decode('utf-8').strip()
         cred_dict = json.loads(decoded)
         cred = credentials.Certificate(cred_dict)
         _firebase_app = firebase_admin.initialize_app(cred)
