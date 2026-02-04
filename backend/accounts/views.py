@@ -10,7 +10,6 @@ from .serializers import (
     ChangeEmailRequestSerializer, GuestLoginSerializer,
 )
 from .permissions import IsAdminUser
-from .firebase_auth import verify_firebase_token, get_or_create_user_from_firebase
 from .google_auth import verify_google_id_token, get_or_create_user_from_google
 from .models import OneTimeToken
 from .email_sender import send_verification_email, send_password_reset_email, send_email_change_confirmation
@@ -269,45 +268,6 @@ class UserViewSet(viewsets.ModelViewSet):
             'user': UserSerializer(request.user).data
         })
     
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
-    def firebase_login(self, request):
-        """
-        Verify Firebase ID token and return backend user. Client uses Firebase ID token
-        for subsequent requests (Authorization: Bearer <id_token>). No Django JWT issued.
-        """
-        id_token = request.data.get('id_token')
-        if not id_token:
-            return Response({
-                'success': False,
-                'message': 'Firebase ID token is required',
-            }, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            firebase_token = verify_firebase_token(id_token)
-            user = get_or_create_user_from_firebase(firebase_token)
-            return Response({
-                'success': True,
-                'message': 'Firebase login successful.',
-                'user': {
-                    'id': str(user.uuid),
-                    'name': user.name,
-                    'email': user.email or '',
-                    'role': user.role,
-                    'phone': user.phone or user.phone_number or '',
-                    'phoneNumber': user.phone_number or '',
-                    'profilePic': user.profile_pic,
-                    'location': user.location or '',
-                    'preferences': user.preferences or '',
-                    'specialization': user.specialization or '',
-                },
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            err_msg = str(e) or 'Firebase authentication failed'
-            logger.error("firebase-login failed (401): %s", err_msg, exc_info=True)
-            return Response({
-                'success': False,
-                'message': err_msg,
-            }, status=status.HTTP_401_UNAUTHORIZED)
-
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='social/google')
     def google_login(self, request):
         """Google OAuth login: accepts id_token from client, verifies and returns JWT."""

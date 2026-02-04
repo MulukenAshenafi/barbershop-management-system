@@ -3,8 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const CUSTOMER_DATA = 'customerData';
 const TOKEN = 'token';
 const REFRESH_TOKEN = 'refreshToken';
-export const FIREBASE_AUTH_FLAG = 'firebaseAuth';
-export const EMAIL_LINK_EMAIL = 'emailLinkEmail';
 export const ACTIVE_BARBERSHOP_ID = 'active_barbershop_id';
 export const USER_ROLE_PREFERENCE = 'user_role_preference';
 export const PENDING_INVITE_TOKEN = 'pending_invite_token';
@@ -57,8 +55,6 @@ export async function clearAuth() {
     CUSTOMER_DATA,
     TOKEN,
     REFRESH_TOKEN,
-    FIREBASE_AUTH_FLAG,
-    EMAIL_LINK_EMAIL,
     ACTIVE_BARBERSHOP_ID,
     USER_ROLE_PREFERENCE,
   ]);
@@ -101,16 +97,6 @@ export async function setPendingInviteToken(token) {
 }
 
 export async function isAuthenticated() {
-  const firebaseMode = await AsyncStorage.getItem(FIREBASE_AUTH_FLAG);
-  if (firebaseMode) {
-    try {
-      const { getFirebaseAuth } = require('./firebase');
-      const auth = getFirebaseAuth();
-      return !!auth?.currentUser;
-    } catch (_) {
-      return false;
-    }
-  }
   const token = await AsyncStorage.getItem(TOKEN);
   return !!token;
 }

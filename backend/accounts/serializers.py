@@ -66,8 +66,8 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Invalid email or password.')
         if not user.is_active:
             raise serializers.ValidationError('User account is disabled.')
-        # Django-native users (no Firebase, not guest) must verify email before login
-        if not user.is_guest and not user.firebase_uid and not user.email_verified:
+        # Django-native users (not guest) must verify email before login
+        if not user.is_guest and not user.email_verified:
             raise serializers.ValidationError('Please verify your email before logging in.')
         attrs['user'] = user
         return attrs

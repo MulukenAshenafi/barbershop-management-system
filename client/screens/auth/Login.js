@@ -16,7 +16,7 @@ import Card from '../../components/common/Card';
 import { useToast } from '../../components/common/Toast';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { loginWithEmail } from '../../services/authService';
+import { loginWithEmail, guestLogin } from '../../services/authService';
 import { fontSizes, spacing, borderRadius, typography } from '../../theme';
 
 const barberBookLogo = require('../../assets/Logo — BarberBook Brand.jpeg');
@@ -28,6 +28,7 @@ const Login = ({ navigation, route }) => {
   const [email, setEmail] = useState(route?.params?.email ?? '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -39,6 +40,19 @@ const Login = ({ navigation, route }) => {
       navigation.reset({ index: 0, routes: [{ name: 'home' }] });
     } else if (error) {
       toast.show(error || 'Invalid credentials', { type: 'error' });
+    }
+  };
+
+  const handleGuest = async () => {
+    setGuestLoading(true);
+    const { success, error } = await guestLogin();
+    setGuestLoading(false);
+    if (success) {
+      toast.show('Signed in as guest', { type: 'success' });
+      await checkAuth();
+      navigation.reset({ index: 0, routes: [{ name: 'home' }] });
+    } else if (error) {
+      toast.show(error || 'Guest sign-in failed', { type: 'error' });
     }
   };
 
@@ -82,6 +96,21 @@ const Login = ({ navigation, route }) => {
             fullWidth
             style={styles.primaryBtn}
           />
+          <Button
+            title="Continue as Guest"
+            onPress={handleGuest}
+            loading={guestLoading}
+            disabled={loading}
+            variant="outline"
+            fullWidth
+            style={styles.guestBtn}
+          />
+          <Text
+            style={[styles.forgotLink, { color: colors.primary }]}
+            onPress={() => navigation.navigate('forgot-password')}
+          >
+            Forgot password?
+          </Text>
           <Text style={[styles.helperText, { color: colors.textSecondary }]}>
             Don't have an account?{' '}
             <Text
@@ -132,7 +161,15 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  guestBtn: {
+    marginBottom: spacing.sm,
+  },
+  forgotLink: {
+    ...typography.bodySmall,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   helperText: {
     ...typography.bodySmall,
