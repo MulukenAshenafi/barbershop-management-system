@@ -24,7 +24,13 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # Comma-separated list from env. In production set ALLOWED_HOSTS (e.g. your-app.onrender.com).
 _allowed = os.getenv('ALLOWED_HOSTS', '').strip()
-ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] if _allowed else ['*']
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] if _allowed else []
+# Render sets RENDER_EXTERNAL_HOSTNAME; allow it so the app works without setting ALLOWED_HOSTS.
+_render_host = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ['*']
 
 
 # Application definition
