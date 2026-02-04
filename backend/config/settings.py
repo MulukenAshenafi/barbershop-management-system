@@ -352,6 +352,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Reduce schema introspection noise in production (unable to guess serializer, etc.)
+        'drf_spectacular': {
+            'handlers': _handlers_root,
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
 
