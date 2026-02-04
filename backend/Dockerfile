@@ -34,11 +34,11 @@ RUN mkdir -p /app/staticfiles /app/media /app/logs
 
 RUN chmod +x /app/wait_for_db.py
 
-# Expose port
+# Expose port (Render sets PORT; default 8000 for local Docker)
 EXPOSE 8000
 
 # Run entrypoint from / so it stays LF; /app is overwritten by volume on host
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
-# Production: run with env from Render (DB_*, SECRET_KEY, etc.). No Compose required.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]
+# Production: bind to PORT so Render health checks pass (Render sets PORT, e.g. 10000)
+CMD ["sh", "-c", "gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
