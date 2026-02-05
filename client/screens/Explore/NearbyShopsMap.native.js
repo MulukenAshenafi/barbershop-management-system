@@ -1,12 +1,14 @@
 /**
  * Map view: user location (circle) and barbershop markers. Tap marker → ShopPublicProfile.
  * Native only – react-native-maps is not supported on web. See NearbyShopsMap.web.js for web.
+ * Requires EXPO_PUBLIC_GOOGLE_MAPS_API_KEY in .env for Android (see app.config.js).
  */
 import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import MapView, { Marker, Circle } from 'react-native-maps';
 
 const { width, height } = Dimensions.get('window');
+const MARKER_COLOR = '#e94560';
 
 export default function NearbyShopsMap({ shops = [], userLocation, radiusKm = 5, onMarkerPress }) {
   const defaultRegion = userLocation
@@ -50,16 +52,12 @@ export default function NearbyShopsMap({ shops = [], userLocation, radiusKm = 5,
             title={shop.name}
             description={shop.distance_km != null ? `${shop.distance_km.toFixed(1)} km away` : shop.city}
             onPress={() => onMarkerPress && onMarkerPress(shop)}
-            pinColor={colors.secondary}
+            pinColor={MARKER_COLOR}
           />
         ))}
     </MapView>
   );
 }
-
-const colors = {
-  secondary: '#e94560',
-};
 
 const styles = StyleSheet.create({
   map: {
