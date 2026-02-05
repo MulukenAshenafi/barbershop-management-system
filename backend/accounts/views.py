@@ -431,18 +431,24 @@ def register(request):
                 break
         return Response({'success': False, 'message': msg, 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
     user = serializer.save()
-    # Send verification email (token was created in serializer create())
+    email_sent = False
     ott = OneTimeToken.objects.filter(
         user=user, purpose=OneTimeToken.PURPOSE_EMAIL_VERIFICATION
     ).order_by('-created_at').first()
     if ott:
         try:
             send_verification_email(user.email, ott.token)
+            email_sent = True
         except Exception as e:
             logger.warning('Verification email send failed: %s', e)
+    message = (
+        'Registration successful. Please check your email to verify your account.'
+        if email_sent
+        else 'Registration successful. You can log in now. (Verification email was not sent; configure EMAIL_HOST on the server to enable it.)'
+    )
     return Response({
         'success': True,
-        'message': 'Registration successful. Please check your email to verify your account.',
+        'message': message,
     }, status=status.HTTP_201_CREATED)
 
 
