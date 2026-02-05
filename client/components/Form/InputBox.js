@@ -23,6 +23,7 @@ const InputBox = ({
   secureTextEntry,
   inputType,
   autoComplete,
+  leftIcon,
   ...rest
 }) => {
   const { colors } = useTheme();
@@ -43,9 +44,19 @@ const InputBox = ({
         focused && styles.wrapperFocused,
       ]}
     >
+      {leftIcon && (
+        <View style={styles.leftIconWrap}>
+          <Feather name={leftIcon} size={20} color={colors.textSecondary} />
+        </View>
+      )}
       <TextInput
         editable
-        style={[styles.input, { color: colors.text }, isPassword && styles.inputPassword]}
+        style={[
+          styles.input,
+          { color: colors.text },
+          isPassword && styles.inputPassword,
+          leftIcon && styles.inputWithLeftIcon,
+        ]}
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
         autoCorrect={false}
@@ -77,6 +88,8 @@ const InputBox = ({
 const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.md,
     minHeight: Math.max(touchTargetMin, 48),
     borderRadius: borderRadius.md,
@@ -86,12 +99,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     ...shadows.sm,
   },
+  leftIconWrap: {
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
+    justifyContent: 'center',
+  },
   input: {
     flex: 1,
     height: Math.max(touchTargetMin, 48),
     paddingHorizontal: spacing.md,
     paddingVertical: Platform.OS === 'ios' ? spacing.sm : 0,
     fontSize: fontSizes.base,
+  },
+  inputWithLeftIcon: {
+    paddingLeft: 0,
   },
   inputPassword: {
     paddingRight: 44,
