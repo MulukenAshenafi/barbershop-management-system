@@ -16,6 +16,7 @@ import {
   shadows,
   touchTargetMin,
 } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
 
 const useNativeDriver = Platform.OS !== 'web';
 
@@ -24,30 +25,32 @@ try {
   haptics = require('expo-haptics');
 } catch (_) {}
 
-const variants = {
-  primary: {
-    bg: colors.primary,
-    text: colors.white,
-  },
-  secondary: {
-    bg: colors.accent,
-    text: colors.white,
-  },
-  danger: {
-    bg: colors.error,
-    text: colors.white,
-  },
-  outline: {
-    bg: 'transparent',
-    text: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  ghost: {
-    bg: colors.gray200,
-    text: colors.text,
-  },
-};
+function getVariants(themeColors) {
+  return {
+    primary: {
+      bg: themeColors.primary,
+      text: themeColors.white,
+    },
+    secondary: {
+      bg: themeColors.accent,
+      text: themeColors.white,
+    },
+    danger: {
+      bg: themeColors.error,
+      text: themeColors.white,
+    },
+    outline: {
+      bg: 'transparent',
+      text: themeColors.text,
+      borderWidth: 1.5,
+      borderColor: themeColors.border,
+    },
+    ghost: {
+      bg: themeColors.gray200,
+      text: themeColors.text,
+    },
+  };
+}
 
 export function Button({
   title,
@@ -60,7 +63,9 @@ export function Button({
   textStyle,
   minHeight = touchTargetMin,
 }) {
+  const { colors: themeColors } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
+  const variants = getVariants(themeColors);
 
   const handlePressIn = () => {
     Animated.spring(scale, {

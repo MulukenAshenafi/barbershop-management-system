@@ -49,41 +49,42 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    """Email/password login. Rejects if account is inactive or (Django-native) email not verified."""
-    email = serializers.EmailField()
+    """Email/password login. Accepts 'email' or 'username' (both used as email lookup). Rejects if inactive or email not verified."""
+    email = serializers.CharField(allow_blank=False, trim_whitespace=True)
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        email = attrs.get('email')
+        email = (attrs.get('email') or '').strip()
         password = attrs.get('password')
-        if not email or not password:
-            raise serializers.ValidationError('Please enter both email and password.')
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError('Invalid email or password.')
+        if not email:
+            raise serializers.ValidationError({'email': ['Please enter your email or username.']})
+        if not password:
+            raise serializers.ValidationError({'password': ['Please enter your password.']})
+        # Look up by email (case-insensitive); frontend may send "email or username" in one field
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            raise serializers.ValidationError({'non_field_errors': ['Invalid email or password.']})
         if not user.check_password(password):
-            raise serializers.ValidationError('Invalid email or password.')
+            raise serializers.ValidationError({'non_field_errors': ['Invalid email or password.']})
         if not user.is_active:
-            raise serializers.ValidationError('User account is disabled.')
-        # Django-native users (not guest) must verify email before login
+            raise serializers.ValidationError({'non_field_errors': ['User account is disabled.']})
         if not user.is_guest and not user.email_verified:
-            raise serializers.ValidationError('Please verify your email before logging in.')
+            raise serializers.ValidationError({'non_field_errors': ['Please verify your email before logging in.']})
         attrs['user'] = user
         return attrs
 
 
 class DjangoRegisterSerializer(serializers.Serializer):
     """Registration: first name, last name, email, password. Account inactive until email verified."""
-    first_name = serializers.CharField(max_length=50, trim_whitespace=True)
-    last_name = serializers.CharField(max_length=50, trim_whitespace=True)
+    first_name = serializers.CharField(max_length=50, trim_whitespace=True, allow_blank=False)
+    last_name = serializers.CharField(max_length=50, trim_whitespace=True, allow_blank=False)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=6)
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        if value and User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError('A user with this email already exists.')
-        return value
+        return (value or '').strip().lower()
 
     def create(self, validated_data):
         first_name = validated_data['first_name'].strip()

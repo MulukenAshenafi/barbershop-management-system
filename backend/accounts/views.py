@@ -113,15 +113,20 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
-        """User login endpoint. Expects JSON: { "email": "...", "password": "..." }."""
-        data = request.data if isinstance(request.data, dict) else {}
-        if not data:
+        """User login endpoint. Expects JSON: { "email": "..." | "username": "...", "password": "..." }."""
+        raw = request.data if isinstance(request.data, dict) else {}
+        if not raw:
             logger.warning("login: empty or non-dict body; Content-Type=%s", request.content_type)
             return Response({
                 'success': False,
                 'message': 'Request body must be JSON with email and password.',
-                'errors': {'detail': 'Empty or invalid JSON body'},
+                'errors': {'detail': ['Empty or invalid JSON body']},
             }, status=status.HTTP_400_BAD_REQUEST)
+        # Normalize: accept both "email" and "username" (UI: "Email or username")
+        data = {
+            'email': (raw.get('email') or raw.get('username') or '').strip(),
+            'password': raw.get('password') or '',
+        }
         serializer = UserLoginSerializer(data=data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
@@ -154,13 +159,17 @@ class UserViewSet(viewsets.ModelViewSet):
             return response
         errors = serializer.errors
         first_msg = 'Invalid credentials'
-        for v in errors.values():
-            if isinstance(v, list) and v:
-                first_msg = str(v[0])
-                break
-            if isinstance(v, str):
-                first_msg = v
-                break
+        # Prefer non_field_errors for login (e.g. "Invalid email or password")
+        if errors.get('non_field_errors') and isinstance(errors['non_field_errors'], list) and errors['non_field_errors']:
+            first_msg = str(errors['non_field_errors'][0])
+        else:
+            for v in errors.values():
+                if isinstance(v, list) and v:
+                    first_msg = str(v[0])
+                    break
+                if isinstance(v, str):
+                    first_msg = v
+                    break
         logger.info("login validation failed: %s", list(errors.keys()))
         return Response({
             'success': False,
@@ -392,20 +401,27 @@ def register(request):
     """
     Register with first name, last name, email, password.
     Account is inactive until email is verified. Sends verification email.
-    Expects JSON: { "first_name", "last_name", "email", "password" } (or camelCase).
+    Accepts JSON with snake_case (first_name, last_name) or camelCase (firstName, lastName).
     """
-    data = request.data if isinstance(request.data, dict) else {}
-    if not data:
+    raw = request.data if isinstance(request.data, dict) else {}
+    if not raw:
         logger.warning("register: empty or non-dict body; Content-Type=%s", request.content_type)
         return Response({
             'success': False,
             'message': 'Request body must be JSON with first_name, last_name, email, and password.',
-            'errors': {'detail': 'Empty or invalid JSON body'},
+            'errors': {'detail': ['Empty or invalid JSON body']},
         }, status=status.HTTP_400_BAD_REQUEST)
+    # Normalize: accept both snake_case and camelCase
+    data = {
+        'first_name': (raw.get('first_name') or raw.get('firstName') or '').strip(),
+        'last_name': (raw.get('last_name') or raw.get('lastName') or '').strip(),
+        'email': (raw.get('email') or '').strip().lower(),
+        'password': raw.get('password') or '',
+    }
     serializer = DjangoRegisterSerializer(data=data)
     if not serializer.is_valid():
-        msg = 'Validation failed'
         errors = serializer.errors
+        msg = 'Validation failed'
         for v in errors.values():
             if isinstance(v, list) and v:
                 msg = str(v[0])
