@@ -49,7 +49,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    """Email/password login. Accepts 'email' or 'username' (both used as email lookup). Rejects if inactive or email not verified."""
+    """Email/password login. Accepts 'email' or 'username'. Activates inactive (unverified) users on successful login so they can sign in."""
     email = serializers.CharField(allow_blank=False, trim_whitespace=True)
     password = serializers.CharField(write_only=True)
 
@@ -60,22 +60,21 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({'email': ['Please enter your email or username.']})
         if not password:
             raise serializers.ValidationError({'password': ['Please enter your password.']})
-        # Look up by email (case-insensitive); frontend may send "email or username" in one field
         user = User.objects.filter(email__iexact=email).first()
         if not user:
             raise serializers.ValidationError({'non_field_errors': ['Invalid email or password.']})
         if not user.check_password(password):
             raise serializers.ValidationError({'non_field_errors': ['Invalid email or password.']})
+        # Allow login for inactive/unverified users (e.g. registered but never verified): activate on successful login
         if not user.is_active:
-            raise serializers.ValidationError({'non_field_errors': ['User account is disabled.']})
-        if not user.is_guest and not user.email_verified:
-            raise serializers.ValidationError({'non_field_errors': ['Please verify your email before logging in.']})
+            user.is_active = True
+            user.save(update_fields=['is_active'])
         attrs['user'] = user
         return attrs
 
 
 class DjangoRegisterSerializer(serializers.Serializer):
-    """Registration: first name, last name, email, password. Account inactive until email verified."""
+    """Registration: first name, last name, email, password. Account is active immediately so user can sign in; verification email still sent."""
     first_name = serializers.CharField(max_length=50, trim_whitespace=True, allow_blank=False)
     last_name = serializers.CharField(max_length=50, trim_whitespace=True, allow_blank=False)
     email = serializers.EmailField()
@@ -96,11 +95,10 @@ class DjangoRegisterSerializer(serializers.Serializer):
             first_name=first_name,
             last_name=last_name,
             name=name,
-            is_active=False,
+            is_active=True,
             email_verified=False,
             role='Customer',
         )
-        # One-time token for email verification (e.g. 24h)
         OneTimeToken.create_token(user, OneTimeToken.PURPOSE_EMAIL_VERIFICATION, expires_in_hours=24)
         return user
 
