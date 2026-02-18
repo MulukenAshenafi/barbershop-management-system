@@ -20,7 +20,7 @@ load_dotenv(BASE_DIR.parent / ".env")
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 # Comma-separated list from env. In production set ALLOWED_HOSTS (e.g. your-app.onrender.com).
 _allowed = os.getenv('ALLOWED_HOSTS', '').strip()

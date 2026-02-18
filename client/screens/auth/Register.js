@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,21 +10,25 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InputBox from '../../components/Form/InputBox';
 import Button from '../../components/common/Button';
 import { useToast } from '../../components/common/Toast';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import config from '../../config';
 import { registerWithEmail, exchangeGoogleToken } from '../../services/authService';
-import { fontSizes, spacing, typography, borderRadius } from '../../theme';
+import { fontSizes, spacing, typography, borderRadius, shadows } from '../../theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+const useNativeDriver = Platform.OS !== 'web';
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL || '';
 const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || '';
 
@@ -32,6 +36,7 @@ const Register = ({ navigation }) => {
   const toast = useToast();
   const { colors } = useTheme();
   const { checkAuth } = useAuth();
+  const insets = useSafeAreaInsets();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,42 +45,62 @@ const Register = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const discovery = AuthSession.useAutoDiscovery('https://accounts.google.com');
-  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: GOOGLE_CLIENT_ID,
-      scopes: ['openid', 'profile', 'email'],
-      redirectUri,
-      usePKCE: true,
-    },
-    discovery
-  );
+  const checkScale = useRef(new Animated.Value(1)).current;
+
+  // Use fixed Expo proxy URL so Google Cloud Web client (https-only) always matches
+  const redirectUri = config.googleRedirectUri;
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_ANDROID_CLIENT_ID,
+    redirectUri,
+  });
 
   useEffect(() => {
-    if (response?.type !== 'success' || googleLoading !== true) return;
-    const params = response.params || {};
-    const idToken = params.id_token || params.access_token;
-    if (!idToken) {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      const idToken = authentication?.idToken || authentication?.accessToken;
+      if (idToken) {
+        handleGoogleExchange(idToken);
+      }
+    } else if (response?.type === 'error') {
       setGoogleLoading(false);
-      Alert.alert('Google Sign-In', 'Could not get token. Try Email sign-in.');
-      return;
+      toast.show('Google sign-in failed', { type: 'error' });
     }
-    exchangeGoogleToken(idToken)
-      .then(({ success, error }) => {
-        setGoogleLoading(false);
-        if (success) {
-          toast.show('Signed in with Google', { type: 'success' });
-          checkAuth().then(() => navigation.reset({ index: 0, routes: [{ name: 'home' }] }));
-        } else {
-          toast.show(error || 'Google sign-in failed', { type: 'error' });
-        }
-      })
-      .catch(() => {
-        setGoogleLoading(false);
-        Alert.alert('Google Sign-In', 'Something went wrong. Try Email sign-in.');
-      });
-  }, [response?.type, response?.params, googleLoading]);
+    // 'cancel' or 'dismiss' just stops loading
+    if (response?.type === 'cancel' || response?.type === 'dismiss') {
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const toggleTerms = useCallback(() => {
+    setAcceptedTerms((prev) => !prev);
+    Animated.sequence([
+      Animated.timing(checkScale, {
+        toValue: 0.8,
+        duration: 80,
+        useNativeDriver,
+      }),
+      Animated.spring(checkScale, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver,
+      }),
+    ]).start();
+  }, [checkScale]);
+
+  const handleGoogleExchange = async (token) => {
+    const { success, error } = await exchangeGoogleToken(token);
+    setGoogleLoading(false);
+    if (success) {
+      toast.show('Signed in with Google', { type: 'success' });
+      checkAuth().then(() => navigation.reset({ index: 0, routes: [{ name: 'home' }] }));
+    } else {
+      toast.show(error || 'Google sign-in failed', { type: 'error' });
+    }
+  };
 
   const handleSignUp = async () => {
     if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
@@ -107,12 +132,13 @@ const Register = ({ navigation }) => {
   };
 
   const handleGoogle = () => {
-    if (!GOOGLE_CLIENT_ID) {
-      toast.show('Google sign-in is not configured. Use Email to sign in.', { type: 'error' });
+    if (!request) {
+      toast.show('Google sign-in is initializing. Please try again.', { type: 'error' });
       return;
     }
     setGoogleLoading(true);
-    promptAsync();
+    // Force useProxy/WebBrowser flow
+    promptAsync({ useProxy: true });
   };
 
   const openLink = (url, label) => {
@@ -127,16 +153,18 @@ const Register = ({ navigation }) => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xxl }]}
         keyboardShouldPersistTaps="always"
         keyboardDismissMode="none"
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Let's get you set up</Text>
           <Text style={[styles.title, { color: colors.text }]}>Create an account</Text>
         </View>
 
+        {/* Form */}
         <View style={styles.form}>
           <InputBox
             placeholder="First name"
@@ -169,22 +197,24 @@ const Register = ({ navigation }) => {
             leftIcon="lock"
           />
 
+          {/* Terms checkbox */}
           <TouchableOpacity
             style={styles.checkboxRow}
-            onPress={() => setAcceptedTerms(!acceptedTerms)}
+            onPress={toggleTerms}
             activeOpacity={0.8}
           >
-            <View
+            <Animated.View
               style={[
                 styles.checkbox,
                 {
-                  borderColor: colors.border,
+                  borderColor: acceptedTerms ? colors.primary : colors.gray400,
                   backgroundColor: acceptedTerms ? colors.primary : 'transparent',
+                  transform: [{ scale: checkScale }],
                 },
               ]}
             >
-              {acceptedTerms && <Ionicons name="checkmark" size={14} color={colors.white} />}
-            </View>
+              {acceptedTerms && <Ionicons name="checkmark" size={16} color={colors.white} />}
+            </Animated.View>
             <Text style={[styles.termsText, { color: colors.textSecondary }]}>
               By continuing you accept our{' '}
               <Text
@@ -218,18 +248,20 @@ const Register = ({ navigation }) => {
             style={styles.primaryBtn}
           />
 
+          {/* Divider */}
           <View style={styles.orRow}>
             <View style={[styles.orLine, { backgroundColor: colors.border }]} />
             <Text style={[styles.orText, { color: colors.textSecondary }]}>Or</Text>
             <View style={[styles.orLine, { backgroundColor: colors.border }]} />
           </View>
 
+          {/* Google */}
           <TouchableOpacity
             style={[
               styles.googleBtn,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
+                backgroundColor: colors.card,
+                borderColor: colors.gray300,
               },
               (googleLoading || loading) && styles.btnDisabled,
             ]}
@@ -241,7 +273,7 @@ const Register = ({ navigation }) => {
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
               <>
-                <Ionicons name="logo-google" size={22} color={colors.text} />
+                <Ionicons name="logo-google" size={20} color="#4285F4" />
                 <Text style={[styles.googleBtnText, { color: colors.text }]}>Continue with Google</Text>
               </>
             )}
@@ -264,8 +296,6 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
   },
   header: {
     alignItems: 'center',
@@ -289,10 +319,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-    borderWidth: 1.5,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
     marginRight: spacing.sm,
     marginTop: 2,
     justifyContent: 'center',
@@ -301,6 +331,7 @@ const styles = StyleSheet.create({
   termsText: {
     ...typography.bodySmall,
     flex: 1,
+    lineHeight: 22,
   },
   termsLink: {
     fontWeight: '600',
@@ -308,6 +339,8 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginBottom: spacing.lg,
+    minHeight: 52,
+    borderRadius: borderRadius.md,
   },
   orRow: {
     flexDirection: 'row',
@@ -328,7 +361,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    minHeight: 48,
+    minHeight: 52,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,

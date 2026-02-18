@@ -3,6 +3,10 @@
 # =============================================================================
 .env
 .env.*
+.env.local
+.env.development
+.env.production
+.env.*.local
 !.env.example
 client/.env
 client/.env.*
@@ -147,6 +151,9 @@ logs/
 # Testing and coverage
 # =============================================================================
 .coverage
+.coverage.*
 .pytest_cache/
 htmlcov/
+coverage/
+*.lcov
 .firebase/

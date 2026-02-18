@@ -7,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { fontSizes, spacing, borderRadius } from '../../theme';
 
-function ErrorBoundaryView({ onReset }) {
+function ErrorBoundaryView({ onReset, error }) {
   const { colors } = useTheme();
   const styles = StyleSheet.create({
     container: {
@@ -26,7 +26,7 @@ function ErrorBoundaryView({ onReset }) {
     },
     message: {
       fontSize: fontSizes.base,
-      color: colors.textSecondary,
+      color: colors.error || 'red',
       textAlign: 'center',
       marginBottom: spacing.lg,
     },
@@ -44,9 +44,9 @@ function ErrorBoundaryView({ onReset }) {
   });
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Something went wrong</Text>
+      <Text style={styles.title}>Debug Error:</Text>
       <Text style={styles.message}>
-        We've hit a snag. Try again or restart the app.
+        {error?.toString() || "Unknown error"}
       </Text>
       <TouchableOpacity
         style={styles.button}
@@ -80,7 +80,7 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      return <ErrorBoundaryView onReset={this.reset} />;
+      return <ErrorBoundaryView onReset={this.reset} error={this.state.error} />;
     }
     return this.props.children;
   }

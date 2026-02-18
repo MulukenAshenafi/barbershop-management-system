@@ -29,9 +29,18 @@ const getForceWelcome = () => {
   return raw === "true" || raw === "1";
 };
 
+/** Expo auth proxy URL for Google OAuth. Web client only accepts https redirects; use this so we don't need barberbook:// */
+const getGoogleRedirectUri = () => {
+  const env = typeof process !== "undefined" && process.env?.EXPO_PUBLIC_GOOGLE_REDIRECT_URI?.trim();
+  if (env && /^https:\/\//.test(env)) return env.replace(/\/$/, "");
+  return "https://auth.expo.io/@mullervic/barberbook";
+};
+
 const config = {
   apiBaseUrl: getApiBaseUrl(),
   /** When true, app always starts at Welcome screen (ignores stored token). Useful for testing. */
   forceWelcome: getForceWelcome(),
+  /** Redirect URI for Google OAuth (must be https; add same value in Google Cloud Web client). */
+  googleRedirectUri: getGoogleRedirectUri(),
 };
 export default config;
