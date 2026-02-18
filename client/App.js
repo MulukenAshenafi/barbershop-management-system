@@ -24,10 +24,14 @@ import ProductDetails from "./screens/ProductDetails";
 import Cart from "./screens/Cart";
 import Checkout from "./screens/Checkout";
 import Payments from "./screens/Payments";
+import SplashScreen from "./screens/auth/SplashScreen";
 import WelcomeScreen from "./screens/auth/WelcomeScreen";
 import Login from "./screens/auth/Login";
 import Register from "./screens/auth/Register";
 import ForgotPasswordScreen from "./screens/auth/ForgotPasswordScreen";
+import OnboardingTermsScreen from "./screens/onboarding/OnboardingTermsScreen";
+import OnboardingWelcomeScreen from "./screens/onboarding/OnboardingWelcomeScreen";
+import NotificationPermissionScreen from "./screens/onboarding/NotificationPermissionScreen";
 import Account from "./screens/Account/Account";
 import Notifications from "./screens/Account/Notifications";
 import NotificationPreferences from "./screens/Account/NotificationPreferences";
@@ -124,9 +128,13 @@ function EnrollmentAwareNavigator({ isAuth }) {
 
   return (
     <Stack.Navigator initialRouteName={initialRoute}>
+      <Stack.Screen name="splash" component={SplashScreen} options={{ headerShown: false }} />
       <Stack.Screen name="welcome" component={WelcomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="login" component={Login} options={{ headerShown: false }} />
       <Stack.Screen name="register" component={Register} options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding-terms" component={OnboardingTermsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding-welcome" component={OnboardingWelcomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="notification-permission" component={NotificationPermissionScreen} options={{ headerShown: false }} />
       <Stack.Screen name="enrollment-gate" component={EnrollmentGateScreen} options={{ headerShown: false }} />
       <Stack.Screen name="barbershop-registration" component={BarbershopRegistrationScreen} options={{ title: "Register Barbershop" }} />
       <Stack.Screen name="join-barbershop" component={JoinBarbershopScreen} options={{ title: "Join Barbershop" }} />
@@ -195,7 +203,7 @@ function ApiHandlersSetup({ navigationRef }) {
               routes: [{ name: "welcome" }],
             });
           }
-        } catch (e) {}
+        } catch (e) { }
       }, 300);
     });
     return () => setUnauthorizedHandler(null);
@@ -248,7 +256,7 @@ export default function App() {
           if (navigationRef.current?.isReady()) {
             navigationRef.current.navigate("join-barbershop", { token });
           }
-        } catch (e) {}
+        } catch (e) { }
         return;
       }
       try {
@@ -267,7 +275,7 @@ export default function App() {
           const id = path.split("/shop/")[1]?.split("/")[0];
           if (id) nav.navigate("ShopPublicProfile", { shopId: id });
         }
-      } catch (e) {}
+      } catch (e) { }
     };
     Linking.getInitialURL().then((url) => {
       if (url) handleUrl(url);
@@ -278,81 +286,85 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <ErrorBoundary>
-      <SafeAreaProvider>
-      <ThemeProvider>
-        <ToastProvider>
-          <ApiHandlersSetup navigationRef={navigationRef} />
-          <ThemeAwareStatusBar />
-          <CartProvider>
-            <AuthProvider>
-            <AuthGate>
-              {(isAuth) => (
-                <BarbershopProvider>
-                  <ThemedNavigationContainer
-                    navigationRef={navigationRef}
-                    linking={{
-                      prefixes: ["barberbook://"],
-                      config: {
-                        screens: {
-                          myappointments: "booking/:bookingId",
-                          myorders: "order/:orderId",
-                          ShopPublicProfile: "shop/:shopId",
-                        },
-                      },
-                    }}
-                  >
-                    <PushNotificationSetup isAuth={isAuth} navigationRef={navigationRef} />
-              {isAuth ? (
-                <EnrollmentAwareNavigator isAuth={isAuth} />
-              ) : (
-                <Stack.Navigator initialRouteName="welcome">
-                  <Stack.Screen name="welcome" component={WelcomeScreen} options={{ headerShown: false }} />
-                  <Stack.Screen name="login" component={Login} options={{ headerShown: false }} />
-                  <Stack.Screen name="register" component={Register} options={{ headerShown: false }} />
-                  <Stack.Screen name="forgot-password" component={ForgotPasswordScreen} options={{ title: 'Reset password' }} />
-                  <Stack.Screen name="join-barbershop" component={JoinBarbershopScreen} options={{ title: "Join Barbershop" }} />
-                  <Stack.Screen name="home" component={Home} options={{ headerShown: false }} />
-                  <Stack.Screen name="ExploreShops" component={ExploreShopsScreen} options={{ title: "Explore Shops" }} />
-                  <Stack.Screen name="ShopPublicProfile" component={ShopPublicProfileScreen} options={{ title: "Shop" }} />
-                  <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: "Reviews" }} />
-                  <Stack.Screen name="productDetails" component={ProductDetails} />
-                  <Stack.Screen name="serviceDetails" component={ServiceDetails} />
-                  <Stack.Screen name="checkout" component={Checkout} />
-                  <Stack.Screen name="Confirmation" component={Confirmation} options={{ headerShown: false }} />
-                  <Stack.Screen name="myorders" component={MyOrders} />
-                  <Stack.Screen name="myappointments" component={MyAppointment} />
-                  <Stack.Screen name="profile" component={Profile} />
-                  <Stack.Screen name="notifications" component={Notifications} />
-                  <Stack.Screen name="adminPanel" component={Dashboard} />
-                  <Stack.Screen name="ManageProduct" component={ManageProduct} />
-                  <Stack.Screen name="ProductList" component={ProductList} />
-                  <Stack.Screen name="ManageServices" component={ManageServices} />
-                  <Stack.Screen name="ManageBarbers" component={ManageBarbers} />
-                  <Stack.Screen name="ManagePayments" component={ManagePayments} />
-                  <Stack.Screen name="ManageBookings" component={ManageBookings} />
-                  <Stack.Screen name="BarberList" component={BarberList} />
-                  <Stack.Screen name="payment" component={Payments} options={{ headerShown: false }} />
-                  <Stack.Screen name="account" component={Account} />
-                  <Stack.Screen name="SetPreferences_Specialization" component={SetPreferences_Specialization} />
-                  <Stack.Screen name="services" component={Services} />
-                  <Stack.Screen name="ServiceList" component={ServiceList} />
-                  <Stack.Screen name="BookService" component={BookService} />
-                  <Stack.Screen name="bookings" component={Bookings} />
-                  <Stack.Screen name="cart" component={Cart} />
-                  <Stack.Screen name="haircut" component={About} />
-                </Stack.Navigator>
-              )}
-                  </ThemedNavigationContainer>
-                </BarbershopProvider>
-              )}
-            </AuthGate>
-            </AuthProvider>
-          </CartProvider>
-        </ToastProvider>
-      </ThemeProvider>
-      </SafeAreaProvider>
-    </ErrorBoundary>
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <ApiHandlersSetup navigationRef={navigationRef} />
+              <ThemeAwareStatusBar />
+              <CartProvider>
+                <AuthProvider>
+                  <AuthGate>
+                    {(isAuth) => (
+                      <BarbershopProvider>
+                        <ThemedNavigationContainer
+                          navigationRef={navigationRef}
+                          linking={{
+                            prefixes: ["barberbook://"],
+                            config: {
+                              screens: {
+                                myappointments: "booking/:bookingId",
+                                myorders: "order/:orderId",
+                                ShopPublicProfile: "shop/:shopId",
+                              },
+                            },
+                          }}
+                        >
+                          <PushNotificationSetup isAuth={isAuth} navigationRef={navigationRef} />
+                          {isAuth ? (
+                            <EnrollmentAwareNavigator isAuth={isAuth} />
+                          ) : (
+                            <Stack.Navigator initialRouteName="splash">
+                              <Stack.Screen name="splash" component={SplashScreen} options={{ headerShown: false }} />
+                              <Stack.Screen name="welcome" component={WelcomeScreen} options={{ headerShown: false }} />
+                              <Stack.Screen name="login" component={Login} options={{ headerShown: false }} />
+                              <Stack.Screen name="register" component={Register} options={{ headerShown: false }} />
+                              <Stack.Screen name="forgot-password" component={ForgotPasswordScreen} options={{ title: 'Reset password' }} />
+                              <Stack.Screen name="onboarding-terms" component={OnboardingTermsScreen} options={{ headerShown: false }} />
+                              <Stack.Screen name="onboarding-welcome" component={OnboardingWelcomeScreen} options={{ headerShown: false }} />
+                              <Stack.Screen name="notification-permission" component={NotificationPermissionScreen} options={{ headerShown: false }} />
+                              <Stack.Screen name="join-barbershop" component={JoinBarbershopScreen} options={{ title: "Join Barbershop" }} />
+                              <Stack.Screen name="home" component={Home} options={{ headerShown: false }} />
+                              <Stack.Screen name="ExploreShops" component={ExploreShopsScreen} options={{ title: "Explore Shops" }} />
+                              <Stack.Screen name="ShopPublicProfile" component={ShopPublicProfileScreen} options={{ title: "Shop" }} />
+                              <Stack.Screen name="Reviews" component={ReviewsScreen} options={{ title: "Reviews" }} />
+                              <Stack.Screen name="productDetails" component={ProductDetails} />
+                              <Stack.Screen name="serviceDetails" component={ServiceDetails} />
+                              <Stack.Screen name="checkout" component={Checkout} />
+                              <Stack.Screen name="Confirmation" component={Confirmation} options={{ headerShown: false }} />
+                              <Stack.Screen name="myorders" component={MyOrders} />
+                              <Stack.Screen name="myappointments" component={MyAppointment} />
+                              <Stack.Screen name="profile" component={Profile} />
+                              <Stack.Screen name="notifications" component={Notifications} />
+                              <Stack.Screen name="adminPanel" component={Dashboard} />
+                              <Stack.Screen name="ManageProduct" component={ManageProduct} />
+                              <Stack.Screen name="ProductList" component={ProductList} />
+                              <Stack.Screen name="ManageServices" component={ManageServices} />
+                              <Stack.Screen name="ManageBarbers" component={ManageBarbers} />
+                              <Stack.Screen name="ManagePayments" component={ManagePayments} />
+                              <Stack.Screen name="ManageBookings" component={ManageBookings} />
+                              <Stack.Screen name="BarberList" component={BarberList} />
+                              <Stack.Screen name="payment" component={Payments} options={{ headerShown: false }} />
+                              <Stack.Screen name="account" component={Account} />
+                              <Stack.Screen name="SetPreferences_Specialization" component={SetPreferences_Specialization} />
+                              <Stack.Screen name="services" component={Services} />
+                              <Stack.Screen name="ServiceList" component={ServiceList} />
+                              <Stack.Screen name="BookService" component={BookService} />
+                              <Stack.Screen name="bookings" component={Bookings} />
+                              <Stack.Screen name="cart" component={Cart} />
+                              <Stack.Screen name="haircut" component={About} />
+                            </Stack.Navigator>
+                          )}
+                        </ThemedNavigationContainer>
+                      </BarbershopProvider>
+                    )}
+                  </AuthGate>
+                </AuthProvider>
+              </CartProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }
